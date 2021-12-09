@@ -1,2 +1,3 @@
-# rust-pulsar-network
-Rust Implementation of Pulsar Network, a distributed hash table messaging protocol.
+# Rust Pulsar Network
+
+Rust Implementation of Pulsar Network, a distributed hash table p2p messaging protocol.
