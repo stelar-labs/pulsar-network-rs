@@ -1,6 +1,6 @@
 [package]
 name = "pulsar-network"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2018"
 license = "MIT"
 description = "A connection Library for the Pulsar Network, a distributed hash table peer-to-peer messaging protocol."

@@ -1,6 +1,6 @@
 
 use neutrondb::Store;
-use stellar_notation::{ encode, decode };
+// use stellar_notation::{ encode, decode };
 use opis::Int;
 
 use std::sync::mpsc;
@@ -8,7 +8,8 @@ use std::net::UdpSocket;
 use std::error::Error;
 use std::thread;
 
-enum MessageKind {
+#[derive(Debug, Clone)]
+pub enum MessageKind {
     Block,
     Transaction,
     Join,
@@ -16,18 +17,23 @@ enum MessageKind {
     Text
 }
 
+#[derive(Debug, Clone)]
 pub struct Message {
     pub kind: MessageKind,
     pub body: Vec<u8>,
     pub signature: Vec<u8>
 }
 
-struct Route { id: Int, ip: String }
+#[derive(Debug, Clone)]
+pub struct Route { id: Int, ip: String }
 
-struct Bucket { distance: Int, routes: Vec<Route> }
+#[derive(Debug, Clone)]
+pub struct Bucket { distance: Int, routes: Vec<Route> }
 
+#[derive(Debug, Clone)]
 pub struct Config { id: String, store: Store }
 
+#[derive(Debug)]
 pub struct Network {
     pub id: Int,
     pub sender: mpsc::Sender<Message>,
@@ -48,13 +54,13 @@ impl Network {
             id: id,
             sender: sender,
             receiver: receiver,
-            buckets: vec![],
+            buckets: Vec::new(),
             store: config.store
         };
 
         let routes = network.store.get_all()?;
 
-        let mut routes_vec: Vec<Route> = vec![];
+        let mut routes_vec: Vec<Route> = Vec::new();
 
         match routes {
 
@@ -62,10 +68,13 @@ impl Network {
                 
                 routes_vec = res.iter()
                     .map(|x| {
+
+                        let id: Int = Int::from_str(&x.0, 16).unwrap();
+                        let ip: String = x.1.to_string();
                         
                         Route {
-                            id: Int::from_str(&x.0, 16).unwrap(),
-                            ip: x.1.to_string()
+                            id: id,
+                            ip: ip
                         }
 
                     })
@@ -82,7 +91,7 @@ impl Network {
 
                 let distance: Int = Int::from_str(&x.to_string(), 10).unwrap();
 
-                let mut bucket_routes = routes_vec;
+                let mut bucket_routes = routes_vec.clone();
 
                 bucket_routes.retain(|x| network.id.clone().sub(&x.id).is_equal(&distance));
 
@@ -102,7 +111,7 @@ impl Network {
 
         thread::spawn(move || {
 
-            let mut network: Network = self;
+            let network: Network = self;
             
             loop {
 
@@ -110,7 +119,7 @@ impl Network {
         
                 let mut buf = [0; 10];
         
-                let (amt, src) = socket.recv_from(&mut buf).unwrap();
+                let (_amt, _src) = socket.recv_from(&mut buf).unwrap();
 
                 let message = Message {
                     kind: MessageKind::Block,
