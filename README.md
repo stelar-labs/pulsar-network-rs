@@ -3,10 +3,10 @@
 Pulsar Network is a distributed hash table peer-to-peer messaging protocol for the Astreuos Blockchain written in Rust.
 
 ### Features
-- Send & Receive Messages between Peers.
-- A Message contains the nonce, body, 
-- Message encryption using chacha20poly1305 and a blake3 hash, of the shared point on Curve 25519, as the key.
-- Peers can be pinged and respond with their public key & routes.
+- Send and Receive Messages between Peers.
+- A Message contains the Body, Message Kind, a Nonce and the Sender Peer. 
+- Message encryption using ChaCha20Poly1305 and a Blake3 hash, of the shared point on Curve 25519, as the key.
+- Peers can be pinged and respond with their public key & routes supported.
 - Currently supported route is Astreuos Blockchain Validation.
  
 ### API
@@ -16,9 +16,13 @@ Pulsar Network is a distributed hash table peer-to-peer messaging protocol for t
 ```
 use pulsar_network::Network;
 
-let network = Network::connect();
+let network = Network::config();
 
 network.validation = true; // join the validation route
+
+for message in network.messages {
+    println!("Got: {}", message);
+}
 
 ```
 
@@ -26,13 +30,13 @@ network.validation = true; // join the validation route
 
 ```
 
-use pulsar_network::Message;
+use pulsar_network::{Message, MessageKind};
 
-let msg: &str = "Hello";
+let message_body: &str = "Hello";
 
-let mut message = Message::new(msg);
+let mut message = Message::new(MessageKind::Block, message_body);
 
-message.expiry = 7_u8; // the default expiry is 1
+message = message.expiry(7_u8); // the default expiry is 1
 
 ```
 
@@ -40,11 +44,21 @@ message.expiry = 7_u8; // the default expiry is 1
 
 ```
 
-network.validation.broadcast(message);
+use pulsar_network::Routes;
+
+network.broadcast(message, Routes::Validation);
+
+```
+
+`Send`
+
+```
+
+network.send(message, incoming_message.sender)
 
 ```
 
 ### Contributions
 Pull requests, bug reports and any kind of suggestion are welcome.
 
-2022-02-20
+2022-02-23
