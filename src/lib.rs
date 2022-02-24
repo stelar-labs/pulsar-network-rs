@@ -13,36 +13,39 @@ use std::thread;
 
 #[derive(Clone, Debug)]
 pub enum MessageKind {
+    BlockRequest,
+    BlockResponse,
     CancelTransaction,
-    LatestBlock,
     NewBlock,
     NewTransaction,
-    StorageRequest,
-    StorageResponse
+    TransactionRequest,
+    TransactionResponse
 }
 
 impl MessageKind {
     
     pub fn from_byte(byte: &u8) -> Self {
         match byte {
-            1 => MessageKind::CancelTransaction,
-            2 => MessageKind::LatestBlock,
-            3 => MessageKind::NewBlock,
-            4 => MessageKind::NewTransaction,
-            5 => MessageKind::StorageRequest,
-            6 => MessageKind::StorageResponse,
-            _ => panic!("{} is not a supported MessageKind!", byte)
+            1 => MessageKind::BlockRequest,
+            2 => MessageKind::BlockResponse,
+            3 => MessageKind::CancelTransaction,
+            4 => MessageKind::NewBlock,
+            5 => MessageKind::NewTransaction,
+            6 => MessageKind::TransactionRequest,
+            7 => MessageKind::TransactionResponse,
+            _ => panic!("{} is not a supported message kind!", byte)
         }
     }
 
     pub fn into_byte(&self) -> u8 {
         match self {
-            MessageKind::CancelTransaction => 1_u8,
-            MessageKind::LatestBlock => 2_u8,
-            MessageKind::NewBlock => 3_u8,
-            MessageKind::NewTransaction => 4_u8,
-            MessageKind::StorageRequest => 5_u8,
-            MessageKind::StorageResponse => 6_u8,
+            MessageKind::BlockRequest => 1_u8,
+            MessageKind::BlockResponse => 2_u8,
+            MessageKind::CancelTransaction => 3_u8,
+            MessageKind::NewBlock => 4_u8,
+            MessageKind::NewTransaction => 5_u8,
+            MessageKind::TransactionRequest => 6_u8,
+            MessageKind::TransactionResponse => 7_u8
         }
     }
 
