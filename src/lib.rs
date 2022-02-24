@@ -53,7 +53,6 @@ pub struct Message {
     body: String,
     kind: MessageKind,
     nonce: String,
-    pub sender: Peer
 }
 
 impl Message {
@@ -62,8 +61,7 @@ impl Message {
         Message {
             body: body.to_string(),
             kind: kind,
-            nonce: "0x00".to_string(),
-            sender: Peer::default()
+            nonce: "0x00".to_string()
         }
     }
 
@@ -74,8 +72,7 @@ impl Message {
         Message {
             body: str::from_utf8(&astro_list[0]).unwrap().to_string(),
             kind: MessageKind::from_byte(&astro_list[1][0]),
-            nonce: str::from_utf8(&astro_list[2]).unwrap().to_string(),
-            sender: Peer::default()
+            nonce: str::from_utf8(&astro_list[2]).unwrap().to_string()
         }
 
     }
@@ -96,25 +93,28 @@ impl Message {
 
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Routes {
-    Validation
+    MainValidation,
+    TestValidation
 }
+
+impl PartialEq for Routes {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Routes::MainValidation, Routes::MainValidation) => true,
+            (Routes::TestValidation, Routes::TestValidation) => true,
+            _ => false
+        }
+    }
+}
+
+impl Eq for Routes {}
 
 #[derive(Clone, Debug)]
 pub struct Peer {
     address: String,
     public_key: [u8;32]
-}
-
-impl Peer {
-
-    pub fn default() -> Self {
-        Peer {
-            address: String::new(),
-            public_key: [0_u8;32]
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -196,14 +196,14 @@ impl Route {
 pub struct Network {
     private_key: [u8;32],
     public_key: [u8;32],
-    pub validation: bool,
-    validation_route: Arc<Mutex<Route>>,
+    routes: Routes,
+    route: Arc<Mutex<Route>>,
     port: u16
 }
 
 impl Network {
 
-    pub fn config() -> Network {
+    pub fn config(routes: Routes) -> Network {
 
         let priv_key = asymmetric::private_key();
 
@@ -214,30 +214,30 @@ impl Network {
         Network {
             private_key: priv_key,
             public_key: pub_key,
-            validation: false,
-            validation_route: Arc::new(Mutex::new(Route{ buckets: HashMap::new() })),
+            routes: routes,
+            route: Arc::new(Mutex::new(Route { buckets: HashMap::new() })),
             port: port
         }
 
     }
 
-    pub fn messages(self) -> Receiver<Message> {
+    pub fn messages(&self) -> Receiver<(Message, Peer)> {
+
+        let (sender, receiver): (Sender<(Message, Peer)>, Receiver<(Message, Peer)>) = mpsc::channel();
 
         let priv_key = self.private_key;
-            
+
         let pub_key = self.public_key;
-        
+
+        let listening_routes = self.routes.clone();
+        let update_routes = self.routes.clone();
+
         let port = self.port;
 
-        let validation = self.validation;
-
-        let validation_route_clone = Arc::clone(&self.validation_route);
-
-        let (sender, receiver): (Sender<Message>, Receiver<Message>) = mpsc::channel();
+        let listening_route_clone = Arc::clone(&self.route);
+        let update_clone = Arc::clone(&self.route);
 
         thread::spawn(move || {
-
-            let validation_route_clone = Arc::clone(&self.validation_route);
 
             let socket = UdpSocket::bind(format!("127.0.0.1:{}", port)).unwrap();
 
@@ -249,33 +249,36 @@ impl Network {
 
                 let raw = &mut raw[..amt];
 
-                let mut validation_route = validation_route_clone.lock().unwrap();
+                let mut route = listening_route_clone.lock().unwrap();
 
                 match raw[0] {
                     // Ping Request 
                     1 => {
 
-                        let mut response = [vec![2], pub_key.to_vec()].concat();
-
-                        if validation {
-                            response = [response, vec![1]].concat();
-                        } else {
-                            response = [response, vec![0]].concat();
-                        }
+                        let response: Vec<u8> = match listening_routes {
+                            Routes::MainValidation => [vec![2], vec![1], pub_key.clone().to_vec()].concat(),
+                            Routes::TestValidation => [vec![2], vec![2], pub_key.clone().to_vec()].concat()
+                        };
 
                         socket.send_to(&response, &src).unwrap();
 
                     },
                     // Ping Response 
                     2 => {
+
+                        let peer_route: Routes = match raw[1] {
+                            1 => Routes::MainValidation,
+                            2 => Routes::TestValidation,
+                            _ => panic!("{} is not a support route!", raw[1])
+                        };
                         
-                        if raw[33] == 1 {
+                        if listening_routes == peer_route {
                             
-                            let peer_key: [u8; 32] = raw[1..33].try_into().unwrap();
+                            let peer_key: [u8;32] = raw[2..34].try_into().unwrap();
                         
                             let peer: Peer = Peer { address: src.to_string(), public_key: peer_key };
                             
-                            *validation_route = validation_route.clone().add_peer(pub_key, peer);
+                            *route = route.clone().add_peer(pub_key, peer);
                         
                         }
 
@@ -293,11 +296,9 @@ impl Network {
                         
                         let _plain_hash = hash(&plain);
                         
-                        let mut msg = Message::from_bytes(&plain.to_vec());
-
-                        msg.sender = peer;
+                        let msg = Message::from_bytes(&plain.to_vec());
                         
-                        sender.send(msg).unwrap()
+                        sender.send((msg, peer)).unwrap()
 
                     },
                     _ => panic!(" {} is not a supported message type!", raw[0])
@@ -317,26 +318,33 @@ impl Network {
 
                     now = Instant::now();
 
-                    let mut validation_route = validation_route_clone.lock().unwrap();
+                    let mut route = update_clone.lock().unwrap();
 
-                    let socket = UdpSocket::bind(format!("127.0.0.1:{}", port)).unwrap();
+                    let clone_route = route.clone();
 
-                    for (_, list) in validation_route.clone().buckets {
+                    *route = Route { buckets: HashMap::new() };
+
+                    drop(route);
+
+                    let socket = UdpSocket::bind(format!("127.0.0.1:{}", &port)).unwrap();
+
+                    for (_, list) in clone_route.buckets {
 
                         for (_, peer) in list {
+
+                            let response: Vec<u8> = match update_routes {
+                                Routes::MainValidation => [vec![1], vec![1], pub_key.to_vec()].concat(),
+                                Routes::TestValidation => [vec![1], vec![2], pub_key.to_vec()].concat()
+                            };
             
-                            let msg = [vec![1], pub_key.to_vec()].concat();
-            
-                            socket.send_to(&msg, &peer.address).unwrap();
+                            socket.send_to(&response, &peer.address).unwrap();
             
                         }
 
                     }
 
-                    *validation_route = Route { buckets: HashMap::new() }
-
-
                 }
+
             }
 
         });
@@ -345,19 +353,13 @@ impl Network {
 
     }
 
-    pub fn broadcast(self, message: Message, route: Routes) {
+    pub fn broadcast(self, message: Message) {
+        
+        let route_clone = Arc::clone(&self.route);
 
-        match route {
-            Routes::Validation => { 
+        let validation_route = route_clone.lock().unwrap().clone();
 
-                let validation_route_clone = Arc::clone(&self.validation_route);
-
-                let validation_route = validation_route_clone.lock().unwrap().clone();
-
-                validation_route.broadcast(message, self.port, self.public_key, self.private_key)
-                
-            }
-        }
+        validation_route.broadcast(message, self.port, self.private_key, self.public_key)
         
     }
 
