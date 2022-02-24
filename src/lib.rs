@@ -50,8 +50,8 @@ impl MessageKind {
 
 #[derive(Clone, Debug)]
 pub struct Message {
-    body: String,
-    kind: MessageKind,
+    pub body: String,
+    pub kind: MessageKind,
     nonce: String,
 }
 
