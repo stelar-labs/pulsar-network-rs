@@ -13,39 +13,30 @@ use std::thread;
 
 #[derive(Clone, Debug)]
 pub enum MessageKind {
-    BlockRequest,
-    BlockResponse,
+    Block,
     CancelTransaction,
-    NewBlock,
-    NewTransaction,
-    TransactionRequest,
-    TransactionResponse
+    NextBlock,
+    Transaction
 }
 
 impl MessageKind {
     
     pub fn from_byte(byte: &u8) -> Self {
         match byte {
-            1 => MessageKind::BlockRequest,
-            2 => MessageKind::BlockResponse,
-            3 => MessageKind::CancelTransaction,
-            4 => MessageKind::NewBlock,
-            5 => MessageKind::NewTransaction,
-            6 => MessageKind::TransactionRequest,
-            7 => MessageKind::TransactionResponse,
+            1 => MessageKind::Block,
+            2 => MessageKind::CancelTransaction,
+            3 => MessageKind::NextBlock,
+            4 => MessageKind::Transaction,
             _ => panic!("{} is not a supported message kind!", byte)
         }
     }
 
     pub fn into_byte(&self) -> u8 {
         match self {
-            MessageKind::BlockRequest => 1_u8,
-            MessageKind::BlockResponse => 2_u8,
-            MessageKind::CancelTransaction => 3_u8,
-            MessageKind::NewBlock => 4_u8,
-            MessageKind::NewTransaction => 5_u8,
-            MessageKind::TransactionRequest => 6_u8,
-            MessageKind::TransactionResponse => 7_u8
+            MessageKind::Block => 1_u8,
+            MessageKind::CancelTransaction => 2_u8,
+            MessageKind::NextBlock => 3_u8,
+            MessageKind::Transaction => 4_u8
         }
     }
 
@@ -55,7 +46,7 @@ impl MessageKind {
 pub struct Message {
     pub body: String,
     pub kind: MessageKind,
-    nonce: String,
+    nonce: [u8; 32],
 }
 
 impl Message {
@@ -64,33 +55,37 @@ impl Message {
         Message {
             body: body.to_string(),
             kind: kind,
-            nonce: "0x00".to_string()
+            nonce: [0_u8; 32]
         }
+    }
+
+    pub fn expiry(self, _days: u8) -> Self {
+        self
     }
 
     pub fn from_bytes(input: &Vec<u8>) -> Self {
         
-        let astro_list = list::as_bytes(str::from_utf8(&input).unwrap());
+        let decoded_list = list::as_bytes(str::from_utf8(&input).unwrap());
 
         Message {
-            body: str::from_utf8(&astro_list[0]).unwrap().to_string(),
-            kind: MessageKind::from_byte(&astro_list[1][0]),
-            nonce: str::from_utf8(&astro_list[2]).unwrap().to_string()
+            body: str::from_utf8(&decoded_list[0]).unwrap().to_string(),
+            kind: MessageKind::from_byte(&decoded_list[1][0]),
+            nonce: decoded_list[2][..].try_into().unwrap()
         }
 
     }
 
     pub fn into_bytes(self) -> Vec<u8> {
         
-        let bytes: Vec<Vec<u8>> = vec![
+        let msg: Vec<Vec<u8>> = vec![
             self.body.into_bytes(),
             vec![self.kind.into_byte()],
-            self.nonce.into_bytes()
+            self.nonce.to_vec()
         ];
 
-        let astro_str: String = list::from_bytes(bytes);
+        let encoded_str: String = list::from_bytes(msg);
 
-        astro_str.into_bytes()
+        encoded_str.into_bytes()
 
     }
 
