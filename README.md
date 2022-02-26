@@ -4,24 +4,24 @@ Pulsar Network is a distributed hash table peer-to-peer messaging protocol for t
 
 ### Features
 - Send and Receive Messages between Peers.
-- A Message contains the Body, Message Kind, a Nonce and the Sender Peer. 
-- Message encryption using ChaCha20Poly1305 and a Blake3 hash, of the shared point on Curve 25519, as the key.
+- A Message contains the Body, Message Kind and a Nonce. 
+- Message encryption uses ChaCha20Poly1305 and a Blake3 hash, of the shared point on Curve 25519, as the key.
 - Peers can be pinged and respond with their public key & routes supported.
-- Currently supported route is Astreuos Blockchain Validation.
+- Currently supported routes are Astreuos Blockchain Main & Test Validation.
  
 ### API
 
 `Connect`
 
 ```
-use pulsar_network::Network;
+use pulsar_network::{ Network, Routes };
 
-let network = Network::config();
+let route = Routes::TestValidation;
 
-network.validation = true; // join the validation route
+let network = Network::config(route);
 
-for message in network.messages {
-    println!("Got: {}", message);
+for (message, peer) in network.messages {
+    println!("Got: {}", message.body);
 }
 
 ```
@@ -30,11 +30,11 @@ for message in network.messages {
 
 ```
 
-use pulsar_network::{Message, MessageKind};
+use pulsar_network::{ Message, MessageKind };
 
-let message_body: &str = "Hello";
+let block_astro_fmt: &str = "0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00";
 
-let mut message = Message::new(MessageKind::Block, message_body);
+let mut message = Message::new(MessageKind::Block, block_astro_fmt);
 
 message = message.expiry(7_u8); // the default expiry is 1
 
@@ -44,9 +44,7 @@ message = message.expiry(7_u8); // the default expiry is 1
 
 ```
 
-use pulsar_network::Routes;
-
-network.broadcast(message, Routes::Validation);
+network.broadcast(message, Routes::TestValidation);
 
 ```
 
@@ -54,11 +52,11 @@ network.broadcast(message, Routes::Validation);
 
 ```
 
-network.send(message, incoming_message.sender)
+network.send(message, peer)
 
 ```
 
 ### Contributions
 Pull requests, bug reports and any kind of suggestion are welcome.
 
-2022-02-23
+2022-02-26

@@ -64,13 +64,15 @@ impl Message {
     }
 
     pub fn from_bytes(input: &Vec<u8>) -> Self {
+
+        let astro_fmt_str: &str = str::from_utf8(&input).unwrap();
         
-        let decoded_list = list::as_bytes(str::from_utf8(&input).unwrap());
+        let decoded = list::as_bytes(astro_fmt_str);
 
         Message {
-            body: str::from_utf8(&decoded_list[0]).unwrap().to_string(),
-            kind: MessageKind::from_byte(&decoded_list[1][0]),
-            nonce: decoded_list[2][..].try_into().unwrap()
+            body: str::from_utf8(&decoded[0]).unwrap().to_string(),
+            kind: MessageKind::from_byte(&decoded[1][0]),
+            nonce: decoded[2][..].try_into().unwrap()
         }
 
     }
@@ -83,9 +85,9 @@ impl Message {
             self.nonce.to_vec()
         ];
 
-        let encoded_str: String = list::from_bytes(msg);
+        let astro_fmt_str: String = list::from_bytes(msg);
 
-        encoded_str.into_bytes()
+        astro_fmt_str.into_bytes()
 
     }
 
@@ -112,7 +114,7 @@ impl Eq for Routes {}
 #[derive(Clone, Debug)]
 pub struct Peer {
     address: String,
-    public_key: [u8;32]
+    public_key: [u8; 32]
 }
 
 #[derive(Clone, Debug)]
@@ -247,9 +249,8 @@ impl Network {
 
                 let raw = &mut raw[..amt];
 
-                let mut route = listening_route_clone.lock().unwrap();
-
                 match raw[0] {
+                    
                     // Ping Request 
                     1 => {
 
@@ -261,6 +262,7 @@ impl Network {
                         socket.send_to(&response, &src).unwrap();
 
                     },
+                    
                     // Ping Response 
                     2 => {
 
@@ -275,12 +277,17 @@ impl Network {
                             let peer_key: [u8;32] = raw[2..34].try_into().unwrap();
                         
                             let peer: Peer = Peer { address: src.to_string(), public_key: peer_key };
+
+                            let mut route = listening_route_clone.lock().unwrap();
                             
                             *route = route.clone().add_peer(pub_key, peer);
+
+                            drop(route);
                         
                         }
 
                     },
+                    
                     // Standard
                     3 => {
                         
@@ -299,7 +306,9 @@ impl Network {
                         sender.send((msg, peer)).unwrap()
 
                     },
+                    
                     _ => panic!(" {} is not a supported message type!", raw[0])
+                    
                 }
 
             }
@@ -330,12 +339,12 @@ impl Network {
 
                         for (_, peer) in list {
 
-                            let response: Vec<u8> = match update_routes {
+                            let ping: Vec<u8> = match update_routes {
                                 Routes::MainValidation => [vec![1], vec![1], pub_key.to_vec()].concat(),
                                 Routes::TestValidation => [vec![1], vec![2], pub_key.to_vec()].concat()
                             };
             
-                            socket.send_to(&response, &peer.address).unwrap();
+                            socket.send_to(&ping, &peer.address).unwrap();
             
                         }
 
