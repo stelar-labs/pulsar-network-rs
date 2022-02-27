@@ -20,7 +20,7 @@ let route = Routes::TestValidation;
 
 let network = Network::config(route);
 
-for (message, peer) in network.messages {
+for (message, peer) in network.connect() {
     println!("Got: {}", message.body);
 }
 
@@ -44,7 +44,7 @@ message = message.expiry(7_u8); // the default expiry is 1
 
 ```
 
-network.broadcast(message, Routes::TestValidation);
+network.broadcast(message);
 
 ```
 
@@ -59,4 +59,4 @@ network.send(message, peer)
 ### Contributions
 Pull requests, bug reports and any kind of suggestion are welcome.
 
-2022-02-26
+2022-02-27

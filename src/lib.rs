@@ -1,10 +1,8 @@
-use astro_notation::list;
-use fides::{asymmetric, hash, symmetric};
+use fides::{chacha20poly1305, hash, x25519};
 use rand::Rng;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::net::UdpSocket;
-use std::str;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
@@ -44,16 +42,16 @@ impl MessageKind {
 
 #[derive(Clone, Debug)]
 pub struct Message {
-    pub body: String,
+    pub body: Vec<u8>,
     pub kind: MessageKind,
     nonce: [u8; 32],
 }
 
 impl Message {
 
-    pub fn new(body: &str, kind: MessageKind) -> Self {
+    pub fn new(body: Vec<u8>, kind: MessageKind) -> Self {
         Message {
-            body: body.to_string(),
+            body: body,
             kind: kind,
             nonce: [0_u8; 32]
         }
@@ -64,31 +62,15 @@ impl Message {
     }
 
     pub fn from_bytes(input: &Vec<u8>) -> Self {
-
-        let astro_fmt_str: &str = str::from_utf8(&input).unwrap();
-        
-        let decoded = list::as_bytes(astro_fmt_str);
-
         Message {
-            body: str::from_utf8(&decoded[0]).unwrap().to_string(),
-            kind: MessageKind::from_byte(&decoded[1][0]),
-            nonce: decoded[2][..].try_into().unwrap()
+            body: input[33..].to_vec(),
+            kind: MessageKind::from_byte(&input[1]),
+            nonce: input[1..33].try_into().unwrap()
         }
-
     }
 
     pub fn into_bytes(self) -> Vec<u8> {
-        
-        let msg: Vec<Vec<u8>> = vec![
-            self.body.into_bytes(),
-            vec![self.kind.into_byte()],
-            self.nonce.to_vec()
-        ];
-
-        let astro_fmt_str: String = list::from_bytes(msg);
-
-        astro_fmt_str.into_bytes()
-
+        vec![vec![self.kind.into_byte()], self.nonce.to_vec(), self.body].concat()
     }
 
 }
@@ -118,7 +100,9 @@ pub struct Peer {
 }
 
 #[derive(Clone, Debug)]
-struct Route { buckets: HashMap<String, HashMap<u8, Peer>> }
+struct Route {
+    buckets: HashMap<String, HashMap<u8, Peer>>
+}
 
 impl Route {
     
@@ -177,9 +161,9 @@ impl Route {
 
             for (_, peer) in list {
 
-                let shared_key = asymmetric::shared_key(&private_key, &peer.public_key);
+                let shared_key = x25519::shared_key(&private_key, &peer.public_key);
 
-                let cipher = symmetric::encrypt(&shared_key, &message.clone().into_bytes());
+                let cipher = chacha20poly1305::encrypt(&shared_key, &message.clone().into_bytes());
 
                 let socket = UdpSocket::bind(format!("127.0.0.1:{}", port)).unwrap();
 
@@ -205,9 +189,9 @@ impl Network {
 
     pub fn config(routes: Routes) -> Network {
 
-        let priv_key = asymmetric::private_key();
+        let priv_key: [u8; 32] = x25519::private_key();
 
-        let pub_key = asymmetric::public_key(&priv_key);
+        let pub_key: [u8; 32] = x25519::public_key(&priv_key);
 
         let port: u16 = rand::thread_rng().gen_range(49152..65535);
 
@@ -221,7 +205,68 @@ impl Network {
 
     }
 
-    pub fn messages(&self) -> Receiver<(Message, Peer)> {
+    fn update(&self) {
+
+        let port: u16 = self.port;
+
+        let public_key: [u8; 32] = self.public_key;
+
+        let routes: Routes = self.routes.clone();
+
+        let route_clone = Arc::clone(&self.route);
+
+        thread::spawn(move || { 
+
+            let mut now = Instant::now();
+
+            loop {
+
+                if now.elapsed().as_secs() > 300 {
+
+                    match route_clone.lock() {
+                        
+                        Ok(mut r) => {
+
+                            let socket = UdpSocket::bind(format!("127.0.0.1:{}", port)).unwrap();
+
+                            let clone_route = r.clone();
+
+                            *r = Route { buckets: HashMap::new() };
+
+                            drop(r);
+
+                            for (_, list) in clone_route.buckets {
+
+                                for (_, peer) in list {
+
+                                    let ping: Vec<u8> = match routes {
+                                        Routes::MainValidation => [vec![1], vec![1], public_key.to_vec()].concat(),
+                                        Routes::TestValidation => [vec![1], vec![2], public_key.to_vec()].concat()
+                                    };
+                    
+                                    socket.send_to(&ping, &peer.address).unwrap();
+                    
+                                }
+
+                            }
+
+                            now = Instant::now();
+
+                        },
+
+                        Err(_) => ()
+
+                    }
+
+                }
+
+            }
+
+        });
+
+    }
+
+    pub fn connect(&self) -> Receiver<(Message, Peer)> {
 
         let (sender, receiver): (Sender<(Message, Peer)>, Receiver<(Message, Peer)>) = mpsc::channel();
 
@@ -229,13 +274,11 @@ impl Network {
 
         let pub_key = self.public_key;
 
-        let listening_routes = self.routes.clone();
-        let update_routes = self.routes.clone();
+        let route_clone = Arc::clone(&self.route);
+
+        let routes = self.routes.clone();
 
         let port = self.port;
-
-        let listening_route_clone = Arc::clone(&self.route);
-        let update_clone = Arc::clone(&self.route);
 
         thread::spawn(move || {
 
@@ -254,7 +297,7 @@ impl Network {
                     // Ping Request 
                     1 => {
 
-                        let response: Vec<u8> = match listening_routes {
+                        let response: Vec<u8> = match routes {
                             Routes::MainValidation => [vec![2], vec![1], pub_key.clone().to_vec()].concat(),
                             Routes::TestValidation => [vec![2], vec![2], pub_key.clone().to_vec()].concat()
                         };
@@ -272,13 +315,13 @@ impl Network {
                             _ => panic!("{} is not a support route!", raw[1])
                         };
                         
-                        if listening_routes == peer_route {
+                        if routes == peer_route {
                             
-                            let peer_key: [u8;32] = raw[2..34].try_into().unwrap();
+                            let peer_key: [u8; 32] = raw[2..34].try_into().unwrap();
                         
                             let peer: Peer = Peer { address: src.to_string(), public_key: peer_key };
 
-                            let mut route = listening_route_clone.lock().unwrap();
+                            let mut route = route_clone.lock().unwrap();
                             
                             *route = route.clone().add_peer(pub_key, peer);
 
@@ -295,9 +338,9 @@ impl Network {
 
                         let peer: Peer = Peer { address: src.to_string(), public_key: peer_key };
                         
-                        let shared_key = asymmetric::shared_key(&priv_key, &peer_key);
+                        let shared_key = x25519::shared_key(&priv_key, &peer_key);
      
-                        let plain = symmetric::decrypt(&shared_key, &raw[33..].to_vec());
+                        let plain = chacha20poly1305::decrypt(&shared_key, &raw[33..].to_vec());
                         
                         let _plain_hash = hash(&plain);
                         
@@ -315,46 +358,7 @@ impl Network {
 
         });
 
-        thread::spawn(move || {
-
-            let mut now = Instant::now();
-
-            loop {
-
-                if now.elapsed().as_secs() > 300 {
-
-                    now = Instant::now();
-
-                    let mut route = update_clone.lock().unwrap();
-
-                    let clone_route = route.clone();
-
-                    *route = Route { buckets: HashMap::new() };
-
-                    drop(route);
-
-                    let socket = UdpSocket::bind(format!("127.0.0.1:{}", &port)).unwrap();
-
-                    for (_, list) in clone_route.buckets {
-
-                        for (_, peer) in list {
-
-                            let ping: Vec<u8> = match update_routes {
-                                Routes::MainValidation => [vec![1], vec![1], pub_key.to_vec()].concat(),
-                                Routes::TestValidation => [vec![1], vec![2], pub_key.to_vec()].concat()
-                            };
-            
-                            socket.send_to(&ping, &peer.address).unwrap();
-            
-                        }
-
-                    }
-
-                }
-
-            }
-
-        });
+        self.update();
 
         receiver
 
@@ -374,9 +378,9 @@ impl Network {
         
         let priv_key = self.private_key;
         
-        let shared_key = asymmetric::shared_key(&priv_key, &peer.public_key);
+        let shared_key = x25519::shared_key(&priv_key, &peer.public_key);
         
-        let cipher = symmetric::encrypt(&shared_key, &message.into_bytes());
+        let cipher = chacha20poly1305::encrypt(&shared_key, &message.into_bytes());
         
         let socket = UdpSocket::bind(format!("127.0.0.1:{}", self.port)).unwrap();
         
