@@ -111,8 +111,8 @@ impl Route {
 pub struct Network {
     private_key: [u8;32],
     public_key: [u8;32],
-    pub incoming_port: u16,
-    outgoing_port: u16,
+    incoming_socket: Arc<Mutex<UdpSocket>>,
+    outgoing_socket: Arc<Mutex<UdpSocket>>,
     routes: Routes,
     route: Arc<Mutex<Route>>
 }
@@ -134,8 +134,8 @@ impl Network {
         Network {
             private_key: priv_key,
             public_key: pub_key,
-            incoming_port: incoming_port,
-            outgoing_port: outgoing_port,
+            incoming_socket: Arc::new(Mutex::new(UdpSocket::bind(format!("127.0.0.1:{}", incoming_port)).unwrap())),
+            outgoing_socket: Arc::new(Mutex::new(UdpSocket::bind(format!("127.0.0.1:{}", outgoing_port)).unwrap())),
             routes: routes,
             route: Arc::new(Mutex::new(Route { buckets: HashMap::new() }))
         }
@@ -149,9 +149,11 @@ impl Network {
             Routes::TestValidation => [vec![1], vec![2], self.public_key.to_vec()].concat()
         };
 
-        let socket = UdpSocket::bind(format!("127.0.0.1:{}", &self.outgoing_port)).unwrap();
+        let outgoing_socket_clone = Arc::clone(&self.outgoing_socket);
 
-        socket.send_to(&join_request, "127.0.0.1:55555").unwrap();
+        let outgoing_socket = outgoing_socket_clone.lock().unwrap();
+
+        outgoing_socket.send_to(&join_request, "127.0.0.1:55555").unwrap();
 
     }
 
@@ -168,12 +170,12 @@ impl Network {
         let route_clone = Arc::clone(&self.route);
 
         let routes = self.routes.clone();
-
-        let incoming_port = self.incoming_port;
-
+        
+        let incoming_socket_clone = Arc::clone(&self.incoming_socket);
+        
         thread::spawn(move || {
 
-            let socket = UdpSocket::bind(format!("127.0.0.1:{}", incoming_port)).unwrap();
+            let incoming_socket = incoming_socket_clone.lock().unwrap();
 
             let mut now = Instant::now();
 
@@ -198,7 +200,7 @@ impl Network {
                                 Routes::TestValidation => [vec![3], vec![2], pub_key.to_vec()].concat()
                             };
             
-                            socket.send_to(&ping, &peer.address).unwrap();
+                            incoming_socket.send_to(&ping, &peer.address).unwrap();
             
                         }
 
@@ -210,7 +212,7 @@ impl Network {
             
                     let mut raw = [0; 256002];
 
-                    let (amt, src) = socket.recv_from(&mut raw).unwrap();
+                    let (amt, src) = incoming_socket.recv_from(&mut raw).unwrap();
 
                     let raw = &mut raw[..amt];
 
@@ -233,7 +235,7 @@ impl Network {
                                     Routes::TestValidation => [vec![3], vec![2], pub_key.clone().to_vec()].concat()
                                 };
         
-                                socket.send_to(&ping, &src).unwrap();
+                                incoming_socket.send_to(&ping, &src).unwrap();
                                 
                                 let route = route_clone.lock().unwrap();
 
@@ -241,9 +243,9 @@ impl Network {
                                     
                                     let peer = list.get(&1).unwrap();
 
-                                    let response: Vec<u8> = [vec![2], peer.address.as_bytes().to_vec()].concat();
+                                    let join_response: Vec<u8> = [vec![2], peer.address.as_bytes().to_vec()].concat();
 
-                                    socket.send_to(&response, &src).unwrap();
+                                    incoming_socket.send_to(&join_response, &src).unwrap();
 
                                 }
                             }
@@ -260,7 +262,7 @@ impl Network {
                                 Routes::TestValidation => [vec![3], vec![2], pub_key.to_vec()].concat()
                             };
 
-                            socket.send_to(&response, address).unwrap();
+                            incoming_socket.send_to(&response, address).unwrap();
 
                         },
                         
@@ -274,7 +276,7 @@ impl Network {
                                 Routes::TestValidation => [vec![4], vec![2], pub_key.clone().to_vec()].concat()
                             };
 
-                            socket.send_to(&response, &src).unwrap();
+                            incoming_socket.send_to(&response, &src).unwrap();
 
                         },
                         
@@ -346,7 +348,9 @@ impl Network {
 
         let route = route_clone.lock().unwrap();
 
-        let socket = UdpSocket::bind(format!("127.0.0.1:{}", &self.outgoing_port)).unwrap();
+        let outgoing_socket_clone = Arc::clone(&self.outgoing_socket);
+
+        let outgoing_socket = outgoing_socket_clone.lock().unwrap();
 
         for (_, list) in &route.buckets {
 
@@ -358,7 +362,7 @@ impl Network {
 
                 let msg = [vec![3], self.public_key.to_vec(), cipher].concat();
 
-                socket.send_to(&msg, &peer.address).unwrap();
+                outgoing_socket.send_to(&msg, &peer.address).unwrap();
 
             }
         }
@@ -377,9 +381,11 @@ impl Network {
         
         let msg = [vec![5], self.public_key.to_vec(), cipher].concat();
 
-        let socket = UdpSocket::bind(format!("127.0.0.1:{}", &self.outgoing_port)).unwrap();
+        let outgoing_socket_clone = Arc::clone(&self.outgoing_socket);
+
+        let outgoing_socket = outgoing_socket_clone.lock().unwrap();
         
-        socket.send_to(&msg, &peer.address).unwrap();
+        outgoing_socket.send_to(&msg, &peer.address).unwrap();
 
     }
     
