@@ -17,7 +17,7 @@ impl Network {
 
     pub fn bootstrap(&self) -> Receiver<(Message, SocketAddr)> {
 
-        println!("listening on pulsar network ...");
+        println!("pulsar: listening ...");
 
         let (sender, receiver): (Sender<(Message, SocketAddr)>, Receiver<(Message, SocketAddr)>) = channel();
 
@@ -34,12 +34,16 @@ impl Network {
         thread::spawn(move || {
 
             let socket = UdpSocket::bind("127.0.0.1:55555").expect("couldn't bind to address, try again!");
+
+            println!("pulsar: listening at port 55555 ...");
         
             let mut now = Instant::now();
 
             loop {
 
                 if now.elapsed().as_secs() > 300 {
+
+                    println!("pulsar: refreshing peer list ...");
 
                     let mut peers = peers_clone.lock().unwrap();
 
@@ -75,7 +79,7 @@ impl Network {
                         
                         1 => {
 
-                            // join request ...
+                            println!("pulsar: join request from {} ...", src);
 
                             let peer_route = Route::from_byte(buf[1]);
 
@@ -107,7 +111,7 @@ impl Network {
                         
                         2 => {
 
-                            // join response ...
+                            println!("pulsar: join response from {} ...", src);
 
                             let address = str::from_utf8(&buf[1..]).unwrap();
                             
@@ -119,7 +123,7 @@ impl Network {
                         
                         3 => {
 
-                            // ping request ...
+                            println!("pulsar: ping request from {} ...", src);
 
                             let response = [vec![4], route.to_bytes(), public_key.to_vec()].concat();
 
@@ -129,7 +133,7 @@ impl Network {
                          
                         4 => {
 
-                            // ping response ...
+                            println!("pulsar: ping response from {} ...", src);
 
                             let peer_route = Route::from_byte(buf[1]);
                             
@@ -152,7 +156,7 @@ impl Network {
                         
                         5 => {
 
-                            // standard message ...
+                            println!("pulsar: message from {} ...", src);
 
                             let shared_keys = shared_keys_clone.lock().unwrap();
 
