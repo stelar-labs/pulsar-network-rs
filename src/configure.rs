@@ -9,7 +9,7 @@ impl Network {
 
     pub fn configure(route: Route) -> Network {
 
-        println!("configuring pulsar client ...");
+        println!("pulsar: configuring ...");
 
         let private_key: [u8; 32] = x25519::private_key();
 

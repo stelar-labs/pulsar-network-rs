@@ -10,7 +10,7 @@ impl Network {
 
     pub fn send(&self, message: Message, peer: SocketAddr) {
 
-        println!("pulsar: sending ...");
+        println!("pulsar: sending message to {} ...", peer);
 
         let port: u16 = rand::thread_rng().gen_range(49152..65535);
 

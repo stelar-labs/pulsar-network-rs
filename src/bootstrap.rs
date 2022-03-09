@@ -17,7 +17,7 @@ impl Network {
 
     pub fn bootstrap(&self) -> Receiver<(Message, SocketAddr)> {
 
-        println!("pulsar: listening ...");
+        println!("pulsar: connecting ...");
 
         let (sender, receiver): (Sender<(Message, SocketAddr)>, Receiver<(Message, SocketAddr)>) = channel();
 
@@ -159,21 +159,24 @@ impl Network {
                             println!("pulsar: message from {} ...", src);
 
                             let shared_keys = shared_keys_clone.lock().unwrap();
-
+                            
                             match shared_keys.get(&src) {
-                                Some(key) => {
-                                    
-                                    let plain = chacha20poly1305::decrypt(&key, &buf[1..].to_vec());
+                                
+                                Some(shared_key) => {
+
+                                    let plain = chacha20poly1305::decrypt(&shared_key, &buf[1..].to_vec());
                                     
                                     match Message::from_bytes(&plain.to_vec()) {
+                                        
                                         Ok(msg) => sender.send((msg, src)).unwrap(),
+                                        
                                         Err(_) => ()
                                     }
                                 },
                                 None => ()
                             }
                         },
-                        _ => panic!(" {} is not a supported message type!", buf[0])
+                        _ => println!(" {} is not a supported message type!", buf[0])
                     }
                 }
             }

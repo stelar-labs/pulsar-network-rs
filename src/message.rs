@@ -50,25 +50,45 @@ impl Message {
 
     }
 
-    pub fn hash(&self) -> [u8; 32] {
+    pub fn message_hash(&self) -> [u8; 32] {
         merkle_tree_hash(vec![
             hash(&self.body),
             hash(&self.kind.into_bytes()),
             hash(&self.nonce.clone().to_ext_bytes(32)),
-            hash(&[vec![0_u8; 24], self.time.to_be_bytes().to_vec()].concat())
+            hash(&self.time.to_be_bytes().to_vec())
         ])
     }
 
     pub fn from_bytes(input: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
 
-        if input.len() < 65 {
+        if input.len() < 42 {
 
-            Ok(Message {
+            let message = Message {
                 kind: MessageKind::from_byte(&input[1]),
                 nonce: Int::from_bytes(&input[1..33].to_vec()),
-                time: u64::from_be_bytes(input[33..65][24..].try_into().unwrap()),
-                body: input[65..].to_vec(),
-            })
+                time: u64::from_be_bytes(input[33..41].try_into().unwrap()),
+                body: input[41..].to_vec(),
+            };
+
+            let current_time: u64 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
+
+            if current_time > message.time && current_time - message.time < 86400 {
+
+                let msg_hash = message.message_hash();
+
+                let first_byte_msg_hash = format!("{:08b}", msg_hash[0]);
+    
+                if first_byte_msg_hash.chars().nth(0).unwrap() == '0' {
+                    
+                    Ok(message)
+
+                } else {
+                    Err("Message too easy!")?
+                }
+
+            } else {
+                Err("Message too old!")?
+            }
 
         } else {
             Err("Message too short!")?
@@ -79,7 +99,7 @@ impl Message {
         vec![
             self.kind.into_bytes(),
             self.nonce.to_ext_bytes(32),
-            [vec![0_u8; 24], self.time.to_be_bytes().to_vec()].concat(),
+            self.time.to_be_bytes().to_vec(),
             self.body
         ].concat()
     }
@@ -88,17 +108,17 @@ impl Message {
 
 fn difficulty(mut msg: Message) -> Message {
 
-    let mut hash = msg.hash();
+    let init_h = msg.message_hash();
     
-    let mut first_byte = format!("{:08b}", hash[0]);
+    let mut first_byte = format!("{:08b}", init_h[0]);
     
     while first_byte.chars().nth(0).unwrap() == '1' {
 
         msg.nonce += Int::one();
 
-        hash = msg.hash();
+        let new_hash = msg.message_hash();
 
-        first_byte = format!("{:08b}", hash[0])
+        first_byte = format!("{:08b}", new_hash[0])
 
     }
 

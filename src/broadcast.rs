@@ -14,7 +14,7 @@ impl Network {
 
         let port: u16 = rand::thread_rng().gen_range(49152..65535);
 
-        let socket: UdpSocket = UdpSocket::bind(format!("127.0.0.1:{}", port)).expect("couldn't bind to address, try again!");
+        let socket = UdpSocket::bind(format!("127.0.0.1:{}", port)).expect("couldn't bind to address, try again!");
         
         let peers_clone = Arc::clone(&self.peers);
 

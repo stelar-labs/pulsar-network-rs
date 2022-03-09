@@ -41,7 +41,7 @@ pub fn add_peer(
 
                         list.insert(list_len, peer_address);
 
-                        peers.insert(current_prefix.clone(), list);
+                        peers.insert(current_prefix, list);
 
                         break
 
@@ -50,7 +50,7 @@ pub fn add_peer(
                 },
 
                 None => {
-                    peers.insert(current_prefix.clone(), HashMap::from([(1, peer_address)]));
+                    peers.insert(current_prefix, HashMap::from([(1, peer_address)]));
                     break
                 }
             }

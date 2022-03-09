@@ -18,7 +18,7 @@ impl Network {
 
     pub fn listen(&self) -> Receiver<(Message, SocketAddr)> {
 
-        println!("pulsar: listening ...");
+        println!("pulsar: connecting ...");
 
         let (sender, receiver): (Sender<(Message, SocketAddr)>, Receiver<(Message, SocketAddr)>) = channel();
 
@@ -44,7 +44,7 @@ impl Network {
 
             let join_request = [vec![1], route.to_bytes()].concat();
 
-            socket.send_to(&join_request, "192.168.100.8:55555").expect("couldn't not join network, try again!");
+            socket.send_to(&join_request, "192.168.100.5:55555").expect("couldn't not join network, try again!");
 
             loop {
 
@@ -76,7 +76,7 @@ impl Network {
 
                 } else {
 
-                    let mut buf = [0; 256002];
+                    let mut buf = [0; 1000000];
 
                     let (amt, src) = socket.recv_from(&mut buf).unwrap();
 
@@ -168,19 +168,22 @@ impl Network {
                             let shared_keys = shared_keys_clone.lock().unwrap();
 
                             match shared_keys.get(&src) {
-                                Some(key) => {
+                                
+                                Some(shared_key) => {
                                     
-                                    let plain = chacha20poly1305::decrypt(&key, &buf[1..].to_vec());
+                                    let plain = chacha20poly1305::decrypt(&shared_key, &buf[1..].to_vec());
                                     
                                     match Message::from_bytes(&plain.to_vec()) {
+                                        
                                         Ok(msg) => sender.send((msg, src)).unwrap(),
+                                        
                                         Err(_) => ()
                                     }
                                 },
                                 None => ()
                             }
                         },
-                        _ => panic!(" {} is not a supported message type!", buf[0])
+                        _ => println!(" {} is not a supported message type!", buf[0])
                     }
                 }
             }
