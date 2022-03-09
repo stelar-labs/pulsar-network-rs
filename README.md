@@ -14,11 +14,11 @@ Pulsar Network is a distributed hash table peer-to-peer messaging protocol for t
 `Connect`
 
 ```
-use pulsar_network::{ Network, Routes };
+use pulsar_network::{Network, Route};
 
-let route = Routes::TestValidation;
+let route = Route::TestValidation;
 
-let network = Network::config(route);
+let network = Network::configure(route);
 
 for (message, peer) in network.listen() {
     println!("Got: {}", message.body);
@@ -30,7 +30,7 @@ for (message, peer) in network.listen() {
 
 ```
 
-use pulsar_network::{ Message, MessageKind };
+use pulsar_network::{Message, MessageKind};
 
 let mut message = Message::new(MessageKind::Block, block in bytes);
 
@@ -55,4 +55,4 @@ network.send(message, peer)
 ### Contributions
 Pull requests, bug reports and any kind of suggestion are welcome.
 
-2022-03-08
+2022-03-09
