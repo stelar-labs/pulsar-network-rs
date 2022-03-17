@@ -18,23 +18,17 @@ impl Network {
         
         let peers_clone = Arc::clone(&self.peers);
 
-        let shared_keys_clone = Arc::clone(&self.shared_keys);
-
-        let shared_keys = shared_keys_clone.lock().unwrap();
-
         let peers = peers_clone.lock().unwrap();
 
         for (_, list) in peers.clone() {
 
             for (_, peer) in list {
 
-                let shared_key = shared_keys.get(&peer).unwrap();
+                let cipher = chacha20poly1305::encrypt(&peer.1, &message.clone().into_bytes());
 
-                let cipher = chacha20poly1305::encrypt(&shared_key, &message.clone().into_bytes());
+                let msg = [vec![5], self.public_key.to_vec(), cipher].concat();
 
-                let msg = [vec![5], cipher].concat();
-
-                socket.send_to(&msg, &peer).unwrap();
+                socket.send_to(&msg, &peer.0).unwrap();
 
             }
         }

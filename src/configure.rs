@@ -19,8 +19,7 @@ impl Network {
             private_key: private_key,
             public_key: public_key,
             route: route,
-            peers: Arc::new(Mutex::new(HashMap::new())),
-            shared_keys: Arc::new(Mutex::new(HashMap::new()))
+            peers: Arc::new(Mutex::new(HashMap::new()))
         }
     }
 }

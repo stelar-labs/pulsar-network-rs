@@ -34,10 +34,7 @@ impl Message {
 
     pub fn new(kind: MessageKind, body: Vec<u8>) -> Self {
 
-        let time = match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-            Ok(n) => n.as_secs(),
-            Err(_) => panic!("SystemTime before UNIX EPOCH!"),
-        };
+        let time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
 
         let msg = Message {
             body: body,
@@ -61,10 +58,10 @@ impl Message {
 
     pub fn from_bytes(input: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
 
-        if input.len() < 42 {
+        if input.len() > 42 {
 
             let message = Message {
-                kind: MessageKind::from_byte(&input[1]),
+                kind: MessageKind::from_byte(&input[0]),
                 nonce: Int::from_bytes(&input[1..33].to_vec()),
                 time: u64::from_be_bytes(input[33..41].try_into().unwrap()),
                 body: input[41..].to_vec(),
@@ -72,9 +69,9 @@ impl Message {
 
             let current_time: u64 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
 
-            if current_time > message.time && current_time - message.time < 86400 {
+            if current_time >= message.time && current_time - message.time < 86400 {
 
-                let msg_hash = message.message_hash();
+                let msg_hash: [u8; 32] = message.message_hash();
 
                 let first_byte_msg_hash = format!("{:08b}", msg_hash[0]);
     
@@ -83,14 +80,15 @@ impl Message {
                     Ok(message)
 
                 } else {
+                    println!("Message too easy!");
                     Err("Message too easy!")?
                 }
-
             } else {
+                println!("Message too old!");
                 Err("Message too old!")?
             }
-
         } else {
+            println!("Message too short!");
             Err("Message too short!")?
         }
     }

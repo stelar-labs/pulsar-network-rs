@@ -18,14 +18,19 @@ pub struct Network {
     private_key: [u8;32],
     public_key: [u8;32],
     route: Route,
-    peers: Arc<Mutex<HashMap<String, HashMap<u8, SocketAddr>>>>,
-    shared_keys: Arc<Mutex<HashMap<SocketAddr, [u8; 32]>>>
+    peers: Arc<Mutex<HashMap<String, HashMap<u8, (SocketAddr, [u8; 32])>>>>
 }
 
 #[derive(Clone, Debug)]
 pub enum Route {
     MainValidation,
     TestValidation
+}
+
+#[derive(Clone, Debug)]
+pub struct Peer {
+    pub address: SocketAddr,
+    shared_key: [u8; 32]
 }
 
 #[derive(Clone, Debug)]

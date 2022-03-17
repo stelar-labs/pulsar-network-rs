@@ -1,9 +1,11 @@
 
+use fides::x25519;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
 pub fn add_peer(
-    peers: &mut HashMap<String, HashMap<u8, SocketAddr>>,
+    peers: &mut HashMap<String, HashMap<u8, (SocketAddr, [u8; 32])>>,
+    private_key: [u8; 32],
     public_key: [u8; 32],
     peer_address: SocketAddr,
     peer_key: [u8; 32]
@@ -22,6 +24,8 @@ pub fn add_peer(
         .collect();
         
     let mut current_prefix: String = String::new();
+
+    let shared_key = x25519::shared_key(&private_key, &peer_key);
     
     for (i, x) in peer_id_bits.iter().enumerate() {
         
@@ -39,7 +43,7 @@ pub fn add_peer(
 
                         let mut list = r.clone();
 
-                        list.insert(list_len, peer_address);
+                        list.insert(list_len, (peer_address, shared_key));
 
                         peers.insert(current_prefix, list);
 
@@ -50,7 +54,7 @@ pub fn add_peer(
                 },
 
                 None => {
-                    peers.insert(current_prefix, HashMap::from([(1, peer_address)]));
+                    peers.insert(current_prefix, HashMap::from([(1, (peer_address, shared_key))]));
                     break
                 }
             }

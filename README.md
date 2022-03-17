@@ -52,7 +52,12 @@ network.send(message, peer)
 
 ```
 
+### Future
+- add sender peer ip information to messages
+- multithreaded listening
+- ephemeral keys & ports
+
 ### Contributions
 Pull requests, bug reports and any kind of suggestion are welcome.
 
-2022-03-09
+2022-03-17

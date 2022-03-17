@@ -1,13 +1,14 @@
 
 use crate::Message;
 use crate::Network;
+use crate::Peer;
 use crate::peers::add_peer;
 use crate::Route;
 use fides::{chacha20poly1305, x25519};
 use rand::Rng;
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::net::{SocketAddr, UdpSocket};
+use std::net::UdpSocket;
 use std::str;
 use std::sync::Arc;
 use std::sync::mpsc::{channel, Sender, Receiver};
@@ -16,11 +17,11 @@ use std::time::Instant;
 
 impl Network {
 
-    pub fn listen(&self) -> Receiver<(Message, SocketAddr)> {
+    pub fn listen(&self) -> Receiver<(Message, Peer)> {
 
         println!("pulsar: connecting ...");
 
-        let (sender, receiver): (Sender<(Message, SocketAddr)>, Receiver<(Message, SocketAddr)>) = channel();
+        let (sender, receiver): (Sender<(Message, Peer)>, Receiver<(Message, Peer)>) = channel();
 
         let private_key = self.private_key;
 
@@ -29,8 +30,6 @@ impl Network {
         let route = self.route.clone();
 
         let peers_clone = Arc::clone(&self.peers);
-
-        let shared_keys_clone = Arc::clone(&self.shared_keys);
 
         thread::spawn(move || {
 
@@ -44,7 +43,7 @@ impl Network {
 
             let join_request = [vec![1], route.to_bytes()].concat();
 
-            socket.send_to(&join_request, "192.168.100.5:55555").expect("couldn't not join network, try again!");
+            socket.send_to(&join_request, "127.0.0.1:55555").expect("couldn't not join network, try again!");
 
             loop {
 
@@ -66,7 +65,7 @@ impl Network {
 
                             let ping_request: Vec<u8> = [vec![3], route.to_bytes(), public_key.to_vec()].concat();
             
-                            socket.send_to(&ping_request, &peer).unwrap();
+                            socket.send_to(&ping_request, peer.0).unwrap();
             
                         }
 
@@ -92,9 +91,9 @@ impl Network {
 
                             if route == peer_route {
                             
-                                let ping: Vec<u8> = [vec![3], route.to_bytes(), public_key.clone().to_vec()].concat();
+                                let ping_request: Vec<u8> = [vec![3], route.to_bytes(), public_key.clone().to_vec()].concat();
 
-                                socket.send_to(&ping, &src).unwrap();
+                                socket.send_to(&ping_request, &src).unwrap();
                                 
                                 let peers = peers_clone.lock().unwrap();
 
@@ -108,7 +107,7 @@ impl Network {
                                     
                                     let peer = list.get(&1).unwrap();
 
-                                    let join_response: Vec<u8> = [vec![2], peer.to_string().as_bytes().to_vec()].concat();
+                                    let join_response: Vec<u8> = [vec![2], peer.0.to_string().as_bytes().to_vec()].concat();
 
                                     socket.send_to(&join_response, &src).unwrap();
 
@@ -132,10 +131,21 @@ impl Network {
                             
                             println!("pulsar: ping request from {} ...", src);
 
-                            let response = [vec![4], route.to_bytes(), public_key.to_vec()].concat();
+                            let peer_route = Route::from_byte(buf[1]);
+                            
+                            if route == peer_route {
+                                
+                                let peer_key: [u8; 32] = buf[2..34].try_into().unwrap();
 
-                            socket.send_to(&response, &src).unwrap();
+                                let mut peers = peers_clone.lock().unwrap();
+                                
+                                add_peer(&mut peers, private_key, public_key, src, peer_key);
 
+                                let ping_response = [vec![4], route.to_bytes(), public_key.to_vec()].concat();
+
+                                socket.send_to(&ping_response, &src).unwrap();
+
+                            }
                         },
                          
                         4 => {
@@ -150,13 +160,7 @@ impl Network {
 
                                 let mut peers = peers_clone.lock().unwrap();
                                 
-                                add_peer(&mut peers, public_key, src, peer_key);
-
-                                let shared_key = x25519::shared_key(&private_key, &peer_key);
-
-                                let mut shared_keys = shared_keys_clone.lock().unwrap();
-
-                                shared_keys.insert(src, shared_key);
+                                add_peer(&mut peers, private_key, public_key, src, peer_key);
                             
                             }
                         },
@@ -165,23 +169,18 @@ impl Network {
                             
                             println!("pulsar: message from {} ...", src);
 
-                            let shared_keys = shared_keys_clone.lock().unwrap();
+                            let peer_key: [u8; 32] = buf[1..33].try_into().unwrap();
 
-                            match shared_keys.get(&src) {
-                                
-                                Some(shared_key) => {
+                            let shared_key = x25519::shared_key(&private_key, &peer_key);
                                     
-                                    let plain = chacha20poly1305::decrypt(&shared_key, &buf[1..].to_vec());
-                                    
-                                    match Message::from_bytes(&plain.to_vec()) {
-                                        
-                                        Ok(msg) => sender.send((msg, src)).unwrap(),
-                                        
-                                        Err(_) => ()
-                                    }
-                                },
-                                None => ()
-                            }
+                            let plain = chacha20poly1305::decrypt(&shared_key, &buf[33..].to_vec());
+                            
+                            let message = Message::from_bytes(&plain).unwrap();
+
+                            let peer: Peer = Peer { address: src, shared_key: shared_key };
+                            
+                            sender.send((message, peer)).unwrap()
+
                         },
                         _ => println!(" {} is not a supported message type!", buf[0])
                     }
