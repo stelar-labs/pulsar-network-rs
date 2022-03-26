@@ -1,13 +1,13 @@
 ## Pulsar Network
 
-Pulsar Network is a distributed hash table peer-to-peer messaging protocol for the Astreuos Blockchain written in Rust.
+Pulsar Network is a distributed hash table peer-to-peer communication protocol for the Astreuos Blockchain.
 
 ### Features
-- Send and Receive Messages between Peers.
-- A Message contains the body, messagekind, nonce and time. 
-- Message encryption uses chacha20poly1305 and a blake3 hash, of the shared point on curve25519, as the key.
-- Peers can be pinged and respond with their public key & routes supported.
-- Currently supported routes are Astreuos Blockchain Main & Test Validation.
+- send and receive messages between peers.
+- a message contains the body, messagekind, nonce and time. 
+- message encryption uses chacha20poly1305 and a blake3 hash, of the shared point on curve25519, as the key.
+- peers can be pinged and respond with their public key and route supported.
+- currently supported routes are Astreuos Blockchain main and test validation routes.
  
 ### API
 
@@ -18,7 +18,9 @@ use pulsar_network::{Network, Route};
 
 let route = Route::TestValidation;
 
-let network = Network::configure(route);
+let seeders: Vec<SocketAddr>;
+
+let network = Network::configure(route, seeders);
 
 for (message, peer) in network.listen() {
     println!("Got: {}", message.body);
@@ -56,8 +58,9 @@ network.send(message, peer)
 - add sender peer ip information to messages
 - multithreaded listening
 - ephemeral keys & ports
+- bluetooth and wifi communication
 
 ### Contributions
 Pull requests, bug reports and any kind of suggestion are welcome.
 
-2022-03-17
+2022-03-26

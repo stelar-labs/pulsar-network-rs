@@ -5,10 +5,8 @@ use crate::Peer;
 use crate::peers::add_peer;
 use crate::Route;
 use fides::{chacha20poly1305, x25519};
-use rand::Rng;
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::net::UdpSocket;
 use std::str;
 use std::sync::Arc;
 use std::sync::mpsc::{channel, Sender, Receiver};
@@ -18,8 +16,6 @@ use std::time::Instant;
 impl Network {
 
     pub fn listen(&self) -> Receiver<(Message, Peer)> {
-
-        println!("pulsar: connecting ...");
 
         let (sender, receiver): (Sender<(Message, Peer)>, Receiver<(Message, Peer)>) = channel();
 
@@ -31,25 +27,29 @@ impl Network {
 
         let peers_clone = Arc::clone(&self.peers);
 
+        let incoming_socket_clone = Arc::clone(&self.incoming_socket);
+
+        let seeders_clone = Arc::clone(&self.seeders);
+
         thread::spawn(move || {
 
-            let port: u16 = rand::thread_rng().gen_range(49152..65535);
-
-            let socket = UdpSocket::bind(format!("127.0.0.1:{}", port)).expect("couldn't bind to address, try again!");
-
-            println!("pulsar: listening at port {} ...", port);
+            let incoming_socket = incoming_socket_clone.lock().unwrap();
         
             let mut now = Instant::now();
 
             let join_request = [vec![1], route.to_bytes()].concat();
 
-            socket.send_to(&join_request, "127.0.0.1:55555").expect("couldn't not join network, try again!");
+            let seeders = seeders_clone.lock().unwrap().clone();
+
+            for seeder in &seeders {
+                
+                let _res = incoming_socket.send_to(&join_request, seeder);
+
+            }
 
             loop {
 
                 if now.elapsed().as_secs() > 300 {
-
-                    println!("pulsar: refreshing peer list ...");
 
                     let mut peers = peers_clone.lock().unwrap();
 
@@ -59,16 +59,25 @@ impl Network {
 
                     drop(peers);
 
-                    for (_, list) in copy_of_peers {
+                    for (_, list) in &copy_of_peers {
 
                         for (_, peer) in list {
 
                             let ping_request: Vec<u8> = [vec![3], route.to_bytes(), public_key.to_vec()].concat();
             
-                            socket.send_to(&ping_request, peer.0).unwrap();
+                            incoming_socket.send_to(&ping_request, peer.0).unwrap();
             
                         }
 
+                    }
+
+                    if copy_of_peers.len() == 1 {
+
+                        for seeder in &seeders {
+                
+                            let _res = incoming_socket.send_to(&join_request, seeder);
+            
+                        }
                     }
 
                     now = Instant::now();
@@ -77,7 +86,7 @@ impl Network {
 
                     let mut buf = [0; 1000000];
 
-                    let (amt, src) = socket.recv_from(&mut buf).unwrap();
+                    let (amt, src) = incoming_socket.recv_from(&mut buf).unwrap();
 
                     let buf = &mut buf[..amt];
 
@@ -85,15 +94,13 @@ impl Network {
                         
                         1 => {
 
-                            println!("pulsar: join request from {} ...", src);
-
                             let peer_route = Route::from_byte(buf[1]);
 
                             if route == peer_route {
                             
                                 let ping_request: Vec<u8> = [vec![3], route.to_bytes(), public_key.clone().to_vec()].concat();
 
-                                socket.send_to(&ping_request, &src).unwrap();
+                                incoming_socket.send_to(&ping_request, &src).unwrap();
                                 
                                 let peers = peers_clone.lock().unwrap();
 
@@ -109,27 +116,23 @@ impl Network {
 
                                     let join_response: Vec<u8> = [vec![2], peer.0.to_string().as_bytes().to_vec()].concat();
 
-                                    socket.send_to(&join_response, &src).unwrap();
+                                    incoming_socket.send_to(&join_response, &src).unwrap();
 
                                 }
                             }
                         },
                         
                         2 => {
-                            
-                            println!("pulsar: join response from {} ...", src);
 
                             let address = str::from_utf8(&buf[1..]).unwrap();
                             
                             let response = [vec![3], route.to_bytes(), public_key.to_vec()].concat();
 
-                            socket.send_to(&response, address).unwrap();
+                            incoming_socket.send_to(&response, address).unwrap();
 
                         },
                         
                         3 => {
-                            
-                            println!("pulsar: ping request from {} ...", src);
 
                             let peer_route = Route::from_byte(buf[1]);
                             
@@ -143,14 +146,12 @@ impl Network {
 
                                 let ping_response = [vec![4], route.to_bytes(), public_key.to_vec()].concat();
 
-                                socket.send_to(&ping_response, &src).unwrap();
+                                incoming_socket.send_to(&ping_response, &src).unwrap();
 
                             }
                         },
                          
                         4 => {
-                            
-                            println!("pulsar: ping response from {} ...", src);
 
                             let peer_route = Route::from_byte(buf[1]);
                             
@@ -166,8 +167,6 @@ impl Network {
                         },
                         
                         5 => {
-                            
-                            println!("pulsar: message from {} ...", src);
 
                             let peer_key: [u8; 32] = buf[1..33].try_into().unwrap();
 
@@ -182,7 +181,7 @@ impl Network {
                             sender.send((message, peer)).unwrap()
 
                         },
-                        _ => println!(" {} is not a supported message type!", buf[0])
+                        _ => ()
                     }
                 }
             }

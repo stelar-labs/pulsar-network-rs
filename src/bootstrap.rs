@@ -18,8 +18,6 @@ impl Network {
 
     pub fn bootstrap(&self) -> Receiver<(Message, Peer)> {
 
-        println!("pulsar: connecting ...");
-
         let (sender, receiver): (Sender<(Message, Peer)>, Receiver<(Message, Peer)>) = channel();
 
         let private_key = self.private_key;
@@ -32,17 +30,13 @@ impl Network {
 
         thread::spawn(move || {
 
-            let socket = UdpSocket::bind("127.0.0.1:55555").expect("couldn't bind to address, try again!");
-
-            println!("pulsar: listening at port 55555 ...");
+            let socket = UdpSocket::bind("192.168.100.5:55555").unwrap();
         
             let mut now = Instant::now();
 
             loop {
 
                 if now.elapsed().as_secs() > 300 {
-
-                    println!("pulsar: refreshing peer list ...");
 
                     let mut peers = peers_clone.lock().unwrap();
 
@@ -78,8 +72,6 @@ impl Network {
                         
                         1 => {
 
-                            println!("pulsar: join request from {} ...", src);
-
                             let peer_route = Route::from_byte(buf[1]);
 
                             if route == peer_route {
@@ -110,8 +102,6 @@ impl Network {
                         
                         2 => {
 
-                            println!("pulsar: join response from {} ...", src);
-
                             let address = str::from_utf8(&buf[1..]).unwrap();
                             
                             let response = [vec![3], route.to_bytes(), public_key.to_vec()].concat();
@@ -122,8 +112,6 @@ impl Network {
                         
                         3 => {
 
-                            println!("pulsar: ping request from {} ...", src);
-
                             let peer_route = Route::from_byte(buf[1]);
                             
                             if route == peer_route {
@@ -131,12 +119,8 @@ impl Network {
                                 let peer_key: [u8; 32] = buf[2..34].try_into().unwrap();
 
                                 let mut peers = peers_clone.lock().unwrap();
-
-                                println!("peers: {:?}", peers);
                                 
                                 add_peer(&mut peers, private_key, public_key, src, peer_key);
-
-                                println!("new peers: {:?}", peers);
 
                                 let ping_response = [vec![4], route.to_bytes(), public_key.to_vec()].concat();
 
@@ -148,8 +132,6 @@ impl Network {
                          
                         4 => {
 
-                            println!("pulsar: ping response from {} ...", src);
-
                             let peer_route = Route::from_byte(buf[1]);
                             
                             if route == peer_route {
@@ -157,19 +139,13 @@ impl Network {
                                 let peer_key: [u8; 32] = buf[2..34].try_into().unwrap();
 
                                 let mut peers = peers_clone.lock().unwrap();
-
-                                println!("peers: {:?}", peers);
                                 
                                 add_peer(&mut peers, private_key, public_key, src, peer_key);
-
-                                println!("peers: {:?}", peers);
                             
                             }
                         },
                         
                         5 => {
-
-                            println!("pulsar: message from {} ...", src);
 
                             let peer_key: [u8; 32] = buf[1..33].try_into().unwrap();
 
@@ -184,7 +160,7 @@ impl Network {
                             sender.send((message, peer)).unwrap()
 
                         },
-                        _ => println!(" {} is not a supported message type!", buf[0])
+                        _ => ()
                     }
                 }
             }

@@ -1,9 +1,9 @@
 [package]
 name = "pulsar-network"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2018"
 license = "MIT"
-description = "Pulsar Network is a distributed hash table peer-to-peer messaging protocol for the Astreuos Blockchain written in Rust."
+description = "Pulsar Network is a distributed hash table peer-to-peer communication protocol for the Astreuos Blockchain."
 repository = "https://github.com/stelar-software/rust-pulsar-network"
 readme = "README.md"
 

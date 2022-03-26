@@ -2,19 +2,15 @@
 use crate::Message;
 use crate::Network;
 use fides::chacha20poly1305;
-use rand::Rng;
-use std::net::UdpSocket;
 use std::sync::Arc;
 
 impl Network {
 
     pub fn broadcast(&self, message: Message) {
 
-        println!("pulsar: broadcasting ...");
+        let outgoing_socket_clone = Arc::clone(&self.outgoing_socket);
 
-        let port: u16 = rand::thread_rng().gen_range(49152..65535);
-
-        let socket = UdpSocket::bind(format!("127.0.0.1:{}", port)).expect("couldn't bind to address, try again!");
+        let outgoing_socket = outgoing_socket_clone.lock().unwrap();
         
         let peers_clone = Arc::clone(&self.peers);
 
@@ -28,7 +24,7 @@ impl Network {
 
                 let msg = [vec![5], self.public_key.to_vec(), cipher].concat();
 
-                socket.send_to(&msg, &peer.0).unwrap();
+                outgoing_socket.send_to(&msg, &peer.0).unwrap();
 
             }
         }

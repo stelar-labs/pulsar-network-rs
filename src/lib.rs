@@ -12,13 +12,17 @@ use opis::Int;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
+use std::net::UdpSocket;
 
 #[derive(Clone, Debug)]
 pub struct Network {
     private_key: [u8;32],
     public_key: [u8;32],
     route: Route,
-    peers: Arc<Mutex<HashMap<String, HashMap<u8, (SocketAddr, [u8; 32])>>>>
+    peers: Arc<Mutex<HashMap<String, HashMap<u8, (SocketAddr, [u8; 32])>>>>,
+    incoming_socket: Arc<Mutex<UdpSocket>>,
+    outgoing_socket: Arc<Mutex<UdpSocket>>,
+    seeders: Arc<Mutex<Vec<SocketAddr>>>
 }
 
 #[derive(Clone, Debug)]

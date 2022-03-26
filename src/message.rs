@@ -80,15 +80,12 @@ impl Message {
                     Ok(message)
 
                 } else {
-                    println!("Message too easy!");
                     Err("Message too easy!")?
                 }
             } else {
-                println!("Message too old!");
                 Err("Message too old!")?
             }
         } else {
-            println!("Message too short!");
             Err("Message too short!")?
         }
     }
