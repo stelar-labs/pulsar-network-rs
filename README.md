@@ -5,10 +5,11 @@ Pulsar Network is the distributed hash table peer-to-peer communication protocol
 ## Features
 
 - send and receive messages between peers.
-- a message contains the body, messagekind, nonce and time. 
-- message encryption uses chacha20poly1305 and a blake3 hash, of the shared point on curve25519, as the key.
+- messages are contained in an envelope with the context, nonce, sender and time.
+- message encryption uses chacha20poly1305 and a x25519 blake3 flavor as the key.
+- peers can join the network by sending join requests and valid peers returning their peer list
 - peers can be pinged and respond with their public key and route supported.
-- currently supported routes are Astreuos Blockchain main and test validation routes.
+- currently supported routes are Astreuos Blockchain Main and Test Nova Routes used for validation.
  
 ## API
 
@@ -37,7 +38,7 @@ for (message, peer) in network.listen() {
 
 use pulsar_network::{ Message, Kind };
 
-let mut message = Message::new(Kind::Block, astro_list_bytes);
+let mut message = Message::new(Kind::PostBlock, astro_list_bytes);
 
 ```
 
