@@ -3,10 +3,10 @@ use std::error::Error;
 
 impl Route {
 
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, Box<dyn Error>> {
-        match bytes {
-            vec![1_u8] => Ok(Route::MainNova),
-            vec![2_u8] => Ok(Route::TestNova),
+    pub fn from_bytes(bytes: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
+        match bytes[0] {
+            1_u8 => Ok(Route::MainNova),
+            2_u8 => Ok(Route::TestNova),
             _ => Err("Route from byte error!")?
         }
     }

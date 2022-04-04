@@ -19,12 +19,12 @@ pub enum Context {
 impl Context {
 
     pub fn from_bytes(byte: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
-        match byte {
-            vec![1_u8] => Ok(Context::JoinRequest),
-            vec![2_u8] => Ok(Context::JoinResponse),
-            vec![3_u8] => Ok(Context::PingRequest),
-            vec![4_u8] => Ok(Context::PingResponse),
-            vec![5_u8] => Ok(Context::Encrypted),
+        match byte[0] {
+            1_u8 => Ok(Context::JoinRequest),
+            2_u8 => Ok(Context::JoinResponse),
+            3_u8 => Ok(Context::PingRequest),
+            4_u8 => Ok(Context::PingResponse),
+            5_u8 => Ok(Context::Encrypted),
             _ => Err("Kind from byte error!")?
         }
     }
@@ -92,10 +92,10 @@ impl Envelope {
                         
                         let envelope = Envelope {
                             context: c,
-                            message: details[1],
+                            message: details[1].clone(),
                             nonce: Int::from_bytes(&details[2]),
-                            sender: details[3].try_into().unwrap(),
-                            time: u64::from_be_bytes(details[4].try_into().unwrap()),
+                            sender: details[3].clone().try_into().unwrap(),
+                            time: u64::from_be_bytes(details[4].clone().try_into().unwrap()),
                         };
 
                         let current_time: u64 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
@@ -129,7 +129,7 @@ impl Envelope {
 
         list::from_bytes(vec![
             self.context.to_bytes(),
-            self.message,
+            self.message.clone(),
             self.nonce.to_bytes(),
             self.sender.to_vec(),
             self.time.to_be_bytes().to_vec()

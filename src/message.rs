@@ -5,11 +5,11 @@ use std::error::Error;
 impl Kind {
 
     pub fn from_bytes(byte: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
-        match byte {
-            vec![1_u8] => Ok(Kind::GetBlock),
-            vec![2_u8] => Ok(Kind::PostBlock),
-            vec![3_u8] => Ok(Kind::PostTransaction),
-            vec![4_u8] => Ok(Kind::CancelTransaction),
+        match byte[0] {
+            1_u8 => Ok(Kind::GetBlock),
+            2_u8 => Ok(Kind::PostBlock),
+            3_u8 => Ok(Kind::PostTransaction),
+            4_u8 => Ok(Kind::CancelTransaction),
             _ => Err("Kind from byte error!")?
         }
     }
@@ -47,7 +47,7 @@ impl Message {
                 Ok(k) => {
                     
                     Ok(Message {
-                        body: details[0],
+                        body: details[0].clone(),
                         kind: k
                     })
                 },
@@ -62,7 +62,7 @@ impl Message {
     pub fn to_astro(&self) -> String {
 
         list::from_bytes(vec![
-            self.body,
+            self.body.clone(),
             self.kind.to_bytes(),
         ])
 

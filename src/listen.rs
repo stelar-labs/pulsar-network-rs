@@ -107,7 +107,7 @@ impl Connection {
 
                                         Context::JoinRequest => {
                                             
-                                            match Route::from_bytes(e.message) {
+                                            match Route::from_bytes(&e.message) {
 
                                                 Ok(r) => {
 
@@ -157,7 +157,7 @@ impl Connection {
                                         
                                         Context::PingRequest => {
 
-                                            match Route::from_bytes(e.message) {
+                                            match Route::from_bytes(&e.message) {
 
                                                 Ok(r) => {
                                                     
@@ -180,7 +180,7 @@ impl Connection {
                                         
                                         Context::PingResponse => {
 
-                                            match Route::from_bytes(e.message) {
+                                            match Route::from_bytes(&e.message) {
 
                                                 Ok(r) => {
                                                     
