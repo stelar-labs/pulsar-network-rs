@@ -1,10 +1,10 @@
-
+use crate::envelope::{ Context, Envelope };
 use crate::Message;
-use crate::Network;
+use crate::Connection;
 use fides::chacha20poly1305;
 use std::sync::Arc;
 
-impl Network {
+impl Connection {
 
     pub fn broadcast(&self, message: Message) {
 
@@ -20,11 +20,11 @@ impl Network {
 
             for (_, peer) in list {
 
-                let cipher = chacha20poly1305::encrypt(&peer.1, &message.clone().into_bytes());
+                let cipher = chacha20poly1305::encrypt(&peer.1, &message.to_astro().into_bytes());
 
-                let msg = [vec![5], self.public_key.to_vec(), cipher].concat();
+                let envelope = Envelope::from(Context::Encrypted, cipher, self.public_key);
 
-                outgoing_socket.send_to(&msg, &peer.0).unwrap();
+                outgoing_socket.send_to(&envelope.to_astro().into_bytes(), &peer.0).unwrap();
 
             }
         }

@@ -1,21 +1,20 @@
-
-mod bootstrap;
 mod broadcast;
 mod configure;
+mod envelope;
 mod listen;
 mod message;
 mod peers;
 mod route;
 mod send;
 use fides::hash;
-use opis::Int;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::net::UdpSocket;
 
 #[derive(Clone, Debug)]
-pub struct Network {
+pub struct Connection {
+    bootstrap: bool,
     private_key: [u8;32],
     public_key: [u8;32],
     route: Route,
@@ -26,9 +25,23 @@ pub struct Network {
 }
 
 #[derive(Clone, Debug)]
+pub enum Kind {
+    GetBlock,
+    PostBlock,
+    PostTransaction,
+    CancelTransaction
+}
+
+#[derive(Clone, Debug)]
+pub struct Message {
+    body: Vec<u8>,
+    kind: Kind,
+}
+
+#[derive(Clone, Debug)]
 pub enum Route {
-    MainValidation,
-    TestValidation
+    MainNova,
+    TestNova
 }
 
 #[derive(Clone, Debug)]
@@ -37,53 +50,45 @@ pub struct Peer {
     shared_key: [u8; 32]
 }
 
-#[derive(Clone, Debug)]
-pub struct Message {
-    pub body: Vec<u8>,
-    pub kind: MessageKind,
-    nonce: Int,
-    time: u64
-}
-
-#[derive(Clone, Debug)]
-pub enum MessageKind {
-    Block,
-    CancelTransaction,
-    NextBlock,
-    Transaction
-}
-
 fn merkle_tree_hash(mut hashes: Vec<[u8;32]>) -> [u8; 32] {
 
-    if hashes.len() % 2 != 0 { hashes.push([0_u8; 32]) };
+    if hashes.is_empty() {
+        
+        [0_u8; 32]
+    
+    } else {
 
-    while hashes.len() > 1 {
+        if hashes.len() % 2 != 0 { hashes.push([0_u8; 32]) };
 
-        let mut cache: Vec<[u8; 32]> = Vec::new();
+        while hashes.len() > 1 {
 
-        let mut intermediate: Vec<[u8; 32]> = Vec::new();
+            let mut cache: Vec<[u8; 32]> = Vec::new();
 
-        for h in &hashes {
-            
-            intermediate.push(*h);
-            
-            if intermediate.len() == 2 {
+            let mut intermediate: Vec<[u8; 32]> = Vec::new();
+
+            for h in &hashes {
                 
-                cache.push(hash(&[
-                    intermediate[0].to_vec(),
-                    intermediate[1].to_vec()
-                ].concat()));
+                intermediate.push(*h);
+                
+                if intermediate.len() == 2 {
+                    
+                    cache.push(hash(&[
+                        intermediate[0].to_vec(),
+                        intermediate[1].to_vec()
+                    ].concat()));
 
-                intermediate.clear()
+                    intermediate.clear()
+
+                }
 
             }
 
-        }
+            hashes = cache
+        
+        };
 
-        hashes = cache
-    
-    };
+        hashes[0]
 
-    hashes[0]
+    }
 
 }

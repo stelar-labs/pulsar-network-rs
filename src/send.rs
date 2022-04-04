@@ -1,11 +1,11 @@
-
+use crate::envelope::{ Context, Envelope };
 use crate::Message;
-use crate::Network;
+use crate::Connection;
 use crate::Peer;
 use fides::chacha20poly1305;
 use std::sync::Arc;
 
-impl Network {
+impl Connection {
 
     pub fn send(&self, message: Message, peer: Peer) {
 
@@ -13,11 +13,11 @@ impl Network {
 
         let outgoing_socket = outgoing_socket_clone.lock().unwrap();
 
-        let cipher = chacha20poly1305::encrypt(&peer.shared_key, &message.into_bytes());
+        let cipher = chacha20poly1305::encrypt(&peer.shared_key, &message.to_astro().into_bytes());
+
+        let envelope = Envelope::from(Context::Encrypted, cipher, self.public_key);
         
-        let msg = [vec![5], self.public_key.to_vec(), cipher].concat();
-        
-        outgoing_socket.send_to(&msg, peer.address).unwrap();
+        outgoing_socket.send_to(&envelope.to_astro().into_bytes(), peer.address).unwrap();
 
     }
 }

@@ -1,20 +1,20 @@
-
 use crate::Route;
+use std::error::Error;
 
 impl Route {
 
-    pub fn from_byte(b: u8) -> Route {
-        match b {
-            1 => Route::MainValidation,
-            2 => Route::TestValidation,
-            _ => panic!("{} is not a support route!", b)
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self, Box<dyn Error>> {
+        match bytes {
+            vec![1_u8] => Ok(Route::MainNova),
+            vec![2_u8] => Ok(Route::TestNova),
+            _ => Err("Route from byte error!")?
         }
     }
     
     pub fn to_bytes(&self) -> Vec<u8> {
         match self {
-            Route::MainValidation => vec![1_u8],
-            Route::TestValidation => vec![2_u8]
+            Route::MainNova => vec![1_u8],
+            Route::TestNova => vec![2_u8]
         }
     }
 }
@@ -22,8 +22,8 @@ impl Route {
 impl PartialEq for Route {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Route::MainValidation, Route::MainValidation) => true,
-            (Route::TestValidation, Route::TestValidation) => true,
+            (Route::MainNova, Route::MainNova) => true,
+            (Route::TestNova, Route::TestNova) => true,
             _ => false
         }
     }

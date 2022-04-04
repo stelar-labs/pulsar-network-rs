@@ -1,6 +1,6 @@
 ## Pulsar Network
 
-Pulsar Network is a distributed hash table peer-to-peer communication protocol for the Astreuos Blockchain.
+Pulsar Network is the distributed hash table peer-to-peer communication protocol for the Astreuos Blockchain.
 
 ### Features
 - send and receive messages between peers.
@@ -14,13 +14,15 @@ Pulsar Network is a distributed hash table peer-to-peer communication protocol f
 `Connect`
 
 ```
-use pulsar_network::{Network, Route};
+use pulsar_network::{ Connection, Route };
 
-let route = Route::TestValidation;
+let route: Route = Route::TestNova;
 
 let seeders: Vec<SocketAddr>;
 
-let network = Network::configure(route, seeders);
+let bootstrap_mode: bool = false;
+
+let network = Connection::configure(route, seeders, bootstrap);
 
 for (message, peer) in network.listen() {
     println!("Got: {}", message.body);
@@ -32,9 +34,9 @@ for (message, peer) in network.listen() {
 
 ```
 
-use pulsar_network::{Message, MessageKind};
+use pulsar_network::{ Message, Kind };
 
-let mut message = Message::new(MessageKind::Block, block in bytes);
+let mut message = Message::new(Kind::Block, astro_list_bytes);
 
 ```
 
@@ -54,13 +56,13 @@ network.send(message, peer)
 
 ```
 
-### Future
-- add sender peer ip information to messages
-- multithreaded listening
-- ephemeral keys & ports
-- bluetooth and wifi communication
+### Improvements
+
+- multi-threading
+- ephemeral keys
+- bluetooth communication
 
 ### Contributions
 Pull requests, bug reports and any kind of suggestion are welcome.
 
-2022-03-26
+2022-04-05

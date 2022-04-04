@@ -1,5 +1,5 @@
 
-use crate::Network;
+use crate::Connection;
 use crate::Route;
 use fides::x25519;
 use std::collections::HashMap;
@@ -7,19 +7,24 @@ use std::sync::{Arc, Mutex};
 use rand::Rng;
 use std::net::{SocketAddr, UdpSocket};
 
-impl Network {
+impl Connection {
 
-    pub fn configure(route: Route, seeders: Vec<SocketAddr>) -> Network {
+    pub fn configure(route: Route, seeders: Vec<SocketAddr>, bootstrap: bool) -> Connection {
 
         let private_key: [u8; 32] = x25519::private_key();
 
         let public_key: [u8; 32] = x25519::public_key(&private_key);
 
-        let incoming_port: u16 = rand::thread_rng().gen_range(49152..65535);
+        let incoming_port: u16 = if bootstrap {
+            55555
+        } else {
+            rand::thread_rng().gen_range(49152..65535)
+        };
 
         let outgoing_port: u16 = rand::thread_rng().gen_range(49152..65535);
 
-        Network {
+        Connection {
+            bootstrap: bootstrap,
             private_key: private_key,
             public_key: public_key,
             route: route,
