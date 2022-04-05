@@ -20,11 +20,11 @@ impl Connection {
 
             for (_, peer) in list {
 
-                let cipher = chacha20poly1305::encrypt(&peer.1, &message.to_astro().into_bytes());
+                let cipher = chacha20poly1305::encrypt(&peer.shared_key, &message.to_astro().into_bytes());
 
                 let envelope = Envelope::from(Context::Encrypted, cipher, self.public_key);
 
-                outgoing_socket.send_to(&envelope.to_astro().into_bytes(), &peer.0).unwrap();
+                outgoing_socket.send_to(&envelope.to_astro().into_bytes(), &peer.address).unwrap();
 
             }
         }

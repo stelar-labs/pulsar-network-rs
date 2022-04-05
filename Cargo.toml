@@ -1,6 +1,6 @@
 [package]
 name = "pulsar-network"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2018"
 license = "MIT"
 description = "Pulsar Network is a distributed hash table peer-to-peer communication protocol for the Astreuos Blockchain."

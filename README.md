@@ -24,7 +24,7 @@ let seeders: Vec<SocketAddr>;
 
 let bootstrap_mode: bool = false;
 
-let network = Connection::configure(route, seeders, bootstrap);
+let network = Connection::configure(route, seeders, bootstrap_mode);
 
 for (message, peer) in network.listen() {
     println!("Got: {}", message.body);

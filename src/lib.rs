@@ -18,7 +18,7 @@ pub struct Connection {
     private_key: [u8;32],
     public_key: [u8;32],
     route: Route,
-    peers: Arc<Mutex<HashMap<String, HashMap<u8, (SocketAddr, [u8; 32])>>>>,
+    peers: Arc<Mutex<HashMap<String, HashMap<u8, Peer>>>>,
     incoming_socket: Arc<Mutex<UdpSocket>>,
     outgoing_socket: Arc<Mutex<UdpSocket>>,
     seeders: Arc<Mutex<Vec<SocketAddr>>>
@@ -34,8 +34,8 @@ pub enum Kind {
 
 #[derive(Clone, Debug)]
 pub struct Message {
-    body: Vec<u8>,
-    kind: Kind,
+    pub body: Vec<u8>,
+    pub kind: Kind,
 }
 
 #[derive(Clone, Debug)]
@@ -47,7 +47,7 @@ pub enum Route {
 #[derive(Clone, Debug)]
 pub struct Peer {
     pub address: SocketAddr,
-    shared_key: [u8; 32]
+    pub shared_key: [u8; 32]
 }
 
 fn merkle_tree_hash(mut hashes: Vec<[u8;32]>) -> [u8; 32] {

@@ -70,7 +70,7 @@ impl Connection {
 
                             let ping_request = Envelope::from(Context::PingRequest, route.to_bytes(), public_key);
             
-                            incoming_socket.send_to(&ping_request.to_astro().into_bytes(), peer.0).unwrap();
+                            incoming_socket.send_to(&ping_request.to_astro().into_bytes(), peer.address).unwrap();
             
                         }
 
@@ -129,7 +129,7 @@ impl Connection {
                                                             
                                                             let peer = list.get(&1).unwrap();
 
-                                                            let join_response = Envelope::from(Context::JoinResponse, peer.0.to_string().into_bytes(), public_key);
+                                                            let join_response = Envelope::from(Context::JoinResponse, peer.address.to_string().into_bytes(), public_key);
 
                                                             incoming_socket.send_to(&join_response.to_astro().into_bytes(), &src).unwrap();
 
