@@ -1,10 +1,9 @@
 use crate::envelope::{ Context, Envelope };
-use crate::Message;
-use crate::Connection;
+use crate::{Client, Message};
 use fides::chacha20poly1305;
 use std::sync::Arc;
 
-impl Connection {
+impl Client {
 
     pub fn broadcast(&self, message: Message) {
 
@@ -20,14 +19,18 @@ impl Connection {
 
             for (_, peer) in list {
 
-                let cipher = chacha20poly1305::encrypt(&peer.shared_key, &message.to_astro().into_bytes());
+                match chacha20poly1305::encrypt(&peer.shared_key, &message.to_bytes()) {
 
-                let envelope = Envelope::from(Context::Encrypted, cipher, self.public_key);
+                    Ok(cipher) => {
 
-                outgoing_socket.send_to(&envelope.to_astro().into_bytes(), &peer.address).unwrap();
+                        let envelope = Envelope::from(Context::Encrypted, cipher, self.public_key);
+                        
+                        let _r = outgoing_socket.send_to(&envelope.to_bytes(), &peer.address);
 
+                    },
+                    Err(_) => ()
+                }
             }
         }
-        
     }
 }

@@ -1,4 +1,4 @@
-use astro_notation::list;
+use astro_format::arrays;
 use crate::{ Kind, Message };
 use std::error::Error;
 
@@ -36,18 +36,18 @@ impl Message {
 
     }
 
-    pub fn from_astro(astro: &str) -> Result<Self, Box<dyn Error>> {
+    pub fn from_bytes(buffer: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
 
-        let details: Vec<Vec<u8>> = list::as_bytes(astro);
+        let decoded: Vec<Vec<u8>> = arrays::decode(buffer);
         
-        if details.len() == 2 {
+        if decoded.len() == 2 {
 
-            match Kind::from_bytes(&details[1]) {
+            match Kind::from_bytes(&decoded[1]) {
 
                 Ok(k) => {
                     
                     Ok(Message {
-                        body: details[0].clone(),
+                        body: decoded[0].clone(),
                         kind: k
                     })
                 },
@@ -59,9 +59,9 @@ impl Message {
         }
     }
 
-    pub fn to_astro(&self) -> String {
+    pub fn to_bytes(&self) -> Vec<u8> {
 
-        list::from_bytes(vec![
+        arrays::encode(&vec![
             self.body.clone(),
             self.kind.to_bytes(),
         ])

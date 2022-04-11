@@ -1,21 +1,19 @@
-
-use crate::Connection;
-use crate::Route;
+use crate::{Client, Config};
 use fides::x25519;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use rand::Rng;
-use std::net::{SocketAddr, UdpSocket};
+use std::net::UdpSocket;
 
-impl Connection {
+impl Client {
 
-    pub fn configure(route: Route, seeders: Vec<SocketAddr>, bootstrap: bool) -> Connection {
+    pub fn new(config: Config) -> Client {
 
         let private_key: [u8; 32] = x25519::private_key();
 
         let public_key: [u8; 32] = x25519::public_key(&private_key);
 
-        let incoming_port: u16 = if bootstrap {
+        let incoming_port: u16 = if config.bootstrap {
             55555
         } else {
             rand::thread_rng().gen_range(49152..65535)
@@ -23,15 +21,15 @@ impl Connection {
 
         let outgoing_port: u16 = rand::thread_rng().gen_range(49152..65535);
 
-        Connection {
-            bootstrap: bootstrap,
+        Client {
+            bootstrap: config.bootstrap,
             private_key: private_key,
             public_key: public_key,
-            route: route,
+            route: config.route,
             peers: Arc::new(Mutex::new(HashMap::new())),
             incoming_socket: Arc::new(Mutex::new(UdpSocket::bind(format!("127.0.0.1:{}", incoming_port)).unwrap())),
             outgoing_socket: Arc::new(Mutex::new(UdpSocket::bind(format!("127.0.0.1:{}", outgoing_port)).unwrap())),
-            seeders: Arc::new(Mutex::new(seeders))
+            seeders: Arc::new(Mutex::new(config.seeders))
         }
     }
 }

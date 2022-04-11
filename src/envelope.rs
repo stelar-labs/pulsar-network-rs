@@ -1,10 +1,8 @@
-use astro_notation::list;
-use crate::merkle_tree_hash;
-use fides::hash;
+use astro_format::arrays;
+use fides::merkle_root;
 use opis::Int;
 use std::convert::TryInto;
 use std::error::Error;
-use std::str;
 use std::time::SystemTime;
 
 #[derive(Clone, Debug)]
@@ -47,14 +45,21 @@ pub struct Envelope {
     pub message: Vec<u8>,
     pub nonce: Int,
     pub sender: [u8; 32],
-    pub time: u64
+    pub time: Int
 }
 
 impl Envelope {
 
     pub fn from(context: Context, message: Vec<u8>, public_key: [u8; 32]) -> Self {
 
-        let time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
+        let time = Int::from_bytes(
+            &SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                .to_be_bytes()
+                .to_vec()
+        );
 
         let envelope = Envelope {
             context: context,
@@ -69,70 +74,71 @@ impl Envelope {
     }
 
     pub fn hash(&self) -> [u8; 32] {
-        merkle_tree_hash(vec![
-            hash(&self.context.to_bytes()),
-            hash(&self.message),
-            hash(&self.nonce.to_bytes()),
-            hash(&self.sender.to_vec()),
-            hash(&self.time.to_be_bytes().to_vec())
+        merkle_root(&vec![
+            self.context.to_bytes(),
+            self.message.clone(),
+            self.nonce.to_bytes(),
+            self.sender.to_vec(),
+            self.time.to_bytes()
         ])
     }
 
-    pub fn from_astro(astro: &str) -> Result<Self, Box<dyn Error>> {
+    pub fn from_bytes(buffer: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
 
-        let details: Vec<Vec<u8>> = list::as_bytes(astro);
+        let decoded = arrays::decode(buffer);
         
-        if details.len() == 5 {
+        if decoded.len() == 5 {
 
-            match Context::from_bytes(&details[0]) {
+            match Context::from_bytes(&decoded[0]) {
 
                 Ok(c) => {
-
-                    if details[3].len() == 8 && details[4].len() == 8 {
                         
-                        let envelope = Envelope {
-                            context: c,
-                            message: details[1].clone(),
-                            nonce: Int::from_bytes(&details[2]),
-                            sender: details[3].clone().try_into().unwrap(),
-                            time: u64::from_be_bytes(details[4].clone().try_into().unwrap()),
-                        };
+                    let envelope = Envelope {
+                        context: c,
+                        message: decoded[1].clone(),
+                        nonce: Int::from_bytes(&decoded[2]),
+                        sender: decoded[3].clone().try_into().unwrap(),
+                        time: Int::from_bytes(&decoded[4])
+                    };
+                    
+                    let envelope_hash: [u8; 32] = envelope.hash();
+            
+                    if envelope_hash[0] == 0 {
+                        
+                        let current_time = Int::from_bytes(
+                            &SystemTime::now()
+                                .duration_since(SystemTime::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs()
+                                .to_be_bytes()
+                                .to_vec()
+                        );
 
-                        let current_time: u64 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
-
-                        if current_time >= envelope.time && current_time - envelope.time < 86400 {
-
-                            let envelope_hash: [u8; 32] = envelope.hash();
-                
-                            if envelope_hash[0] == 0 {
-                                
-                                Ok(envelope)
-
-                            } else {
-                                Err("Message too easy!")?
-                            }
+                        if current_time >= envelope.time && current_time - envelope.clone().time < Int::from_decimal("86400") {
+                            Ok(envelope)
                         } else {
                             Err("Message too old!")?
                         }
+
                     } else {
-                        Err("Sender & Time not 8 bytes!")?
+                        Err("Message too easy!")?
                     }
                 },
                 Err(e) => Err(e)?
             }            
         } else {
-            Err("Message inputs must be 4!")?
+            Err("Parameter error!")?
         }
     }
 
-    pub fn to_astro(&self) -> String {
+    pub fn to_bytes(&self) -> Vec<u8> {
 
-        list::from_bytes(vec![
+        arrays::encode(&vec![
             self.context.to_bytes(),
             self.message.clone(),
             self.nonce.to_bytes(),
             self.sender.to_vec(),
-            self.time.to_be_bytes().to_vec()
+            self.time.to_bytes()
         ])
 
     }
