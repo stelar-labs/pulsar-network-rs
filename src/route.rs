@@ -3,7 +3,7 @@ use std::error::Error;
 
 impl Route {
 
-    pub fn from_bytes(bytes: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Box<dyn Error>> {
         match bytes[0] {
             1_u8 => Ok(Route::Main),
             2_u8 => Ok(Route::Test),

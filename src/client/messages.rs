@@ -1,7 +1,7 @@
-use crate::envelope::{Context, Envelope};
-use crate::{Client, Message, Peer, Route};
-use crate::peers::add_peer;
+use crate::envelope::{Envelope, Kind};
+use crate::{Client, Message, Peer};
 use fides::{chacha20poly1305, x25519};
+use opis::Int;
 use std::collections::HashMap;
 use std::str;
 use std::sync::Arc;
@@ -37,7 +37,7 @@ impl Client {
             
             let seeders = seeders_clone.lock().unwrap().clone();
 
-            let join_request = Envelope::from(Context::JoinRequest, route.to_bytes(), public_key);
+            let join_request = Envelope::new(Kind::JoinRequest, &route.to_bytes(), &public_key, &route);
             
             if !bootstrap {
 
@@ -61,12 +61,12 @@ impl Client {
 
                     drop(peers);
 
+                    let ping_request = Envelope::new(Kind::PingRequest, &[], &public_key, &route);
+
                     for (_, list) in &copy_of_peers {
 
                         for (_, peer) in list {
 
-                            let ping_request = Envelope::from(Context::PingRequest, route.to_bytes(), public_key);
-            
                             incoming_socket.send_to(&ping_request.to_bytes(), peer.address).unwrap();
             
                         }
@@ -96,126 +96,131 @@ impl Client {
 
                         Ok(e) => {
 
-                            match e.context {
+                            if e.route == route {
 
-                                Context::JoinRequest => {
-                                    
-                                    match Route::from_bytes(&e.message) {
+                                match e.kind {
 
-                                        Ok(r) => {
-
-                                            if route == r {
-
-                                                let ping_request = Envelope::from(Context::PingRequest, e.message, public_key);
-
-                                                incoming_socket.send_to(&ping_request.to_bytes(), &src).unwrap();
-                                                
-                                                let peers = peers_clone.lock().unwrap();
-
-                                                let copy_of_peers = peers.clone();
-
-                                                drop(peers);
-
-                                                for (_, list) in copy_of_peers {
-                                                    
-                                                    let peer = list.get(&1).unwrap();
-
-                                                    let join_response = Envelope::from(Context::JoinResponse, peer.address.to_string().into_bytes(), public_key);
-
-                                                    incoming_socket.send_to(&join_response.to_bytes(), &src).unwrap();
-
-                                                }
-                                            }
-                                        },
-                                        Err(_) => ()
-                                    }
-                                },
-                
-                                Context::JoinResponse => {
-
-                                    match str::from_utf8(&e.message) {
-                
-                                        Ok(s) => {
-
-                                            let ping_request = Envelope::from(Context::PingResponse, route.to_bytes(), public_key);
-                                    
-                                            incoming_socket.send_to(&ping_request.to_bytes(), s).unwrap();
-
-                                        },
-                                        Err(_) => ()
-                                    }
-                                },
-                                
-                                Context::PingRequest => {
-
-                                    match Route::from_bytes(&e.message) {
-
-                                        Ok(r) => {
-                                            
-                                            if route == r {
-
-                                                let mut peers = peers_clone.lock().unwrap();
-                                                
-                                                add_peer(&mut peers, private_key, public_key, src, e.sender);
-                                                
-                                                let ping_response = Envelope::from(Context::PingResponse, route.to_bytes(), public_key);
-
-                                                incoming_socket.send_to(&ping_response.to_bytes(), &src).unwrap();
-
-                                            }
-
-                                        },
-                                        Err(_) => ()
-                                    }
-                                },
-                                
-                                Context::PingResponse => {
-
-                                    match Route::from_bytes(&e.message) {
-
-                                        Ok(r) => {
-                                            
-                                            if route == r {
-                                                
-                                                let mut peers = peers_clone.lock().unwrap();
+                                    Kind::JoinRequest => {
                                         
-                                                add_peer(&mut peers, private_key, public_key, src, e.sender);
+                                        let ping_request = Envelope::new(Kind::PingRequest, &[], &public_key, &route);
 
+                                        incoming_socket.send_to(&ping_request.to_bytes(), &src).unwrap();
+                                                    
+                                        let tables = peers_clone.lock().unwrap();
+
+                                        for (_, table) in tables.iter() {
+                                            
+                                            let mut peers = Vec::new();
+                                            
+                                            for (_, peer) in table {
+                                                peers.push(peer);
                                             }
 
-                                        },
-                                        Err(_) => ()
-                                    }
-                                },
-                                
-                                Context::Encrypted => {
+                                            peers.sort_by_key(|k| Int::from_bytes(&public_key) ^ Int::from_bytes(&k.public_key));
 
-                                    let shared_key = x25519::shared_key(&private_key, &e.sender);
+                                            let join_response = Envelope::new(Kind::JoinResponse, peers[0].address.to_string().as_bytes(), &public_key, &route);
+
+                                            incoming_socket.send_to(&join_response.to_bytes(), &src).unwrap();
+
+                                        }
+
+                                    },
+                    
+                                    Kind::JoinResponse => {
+
+                                        match str::from_utf8(&e.message) {
+                    
+                                            Ok(s) => {
+
+                                                let ping_request = Envelope::new(Kind::PingResponse, &[], &public_key, &route);
+                                        
+                                                incoming_socket.send_to(&ping_request.to_bytes(), s).unwrap();
+
+                                            },
+
+                                            Err(_) => ()
+
+                                        }
+
+                                    },
+                                    
+                                    Kind::PingRequest => {
+                                        
+                                        let mut peers = peers_clone.lock().unwrap();
+
+                                        let peer = Peer {
+                                            address: src,
+                                            public_key: e.sender,
+                                            shared_key: x25519::shared_key(&private_key, &e.sender)
+                                        };
+                                        
+                                        peer.add_peer(&mut peers, public_key);
+                                        
+                                        let ping_response = Envelope::new(Kind::PingResponse, &[], &public_key, &route);
+                                        
+                                        incoming_socket.send_to(&ping_response.to_bytes(), &src).unwrap();
+                                        
+                                    },
+                                    
+                                    Kind::PingResponse => {
+
+                                        let peer = Peer {
+                                            address: src,
+                                            public_key: e.sender,
+                                            shared_key: x25519::shared_key(&private_key, &e.sender)
+                                        };
+                                        
+                                        let mut peers = peers_clone.lock().unwrap();
                                             
-                                    match chacha20poly1305::decrypt(&shared_key, &e.message) {
+                                        peer.add_peer(&mut peers, public_key);
 
-                                        Ok(plain) => {
-                                            match Message::from_bytes(&plain) {
+                                    },
+                                    
+                                    Kind::Encrypted => {
 
-                                                Ok(message) => {
-                                                    
-                                                    let peer: Peer = Peer { address: src, shared_key: shared_key };
-                                                    
-                                                    sender.send((message, peer)).unwrap()
+                                        let shared_key = x25519::shared_key(&private_key, &e.sender);
+                                                
+                                        match chacha20poly1305::decrypt(&shared_key, &e.message) {
 
-                                                },
-                                                Err(_) => ()
-                                            }   
-                                        },
-                                        Err(_) => ()
+                                            Ok(plain) => {
+                                                match Message::from_bytes(&plain) {
+
+                                                    Ok(message) => {
+                                                        
+                                                        let peer = Peer {
+                                                            address: src,
+                                                            public_key: e.sender,
+                                                            shared_key: shared_key
+                                                        };
+                                                        
+                                                        sender.send((message, peer)).unwrap()
+
+                                                    },
+                                                    Err(_) => ()
+                                                }
+
+                                            },
+
+                                            Err(_) => ()
+
+                                        }
+
                                     }
+
                                 }
+                            
                             }
+
                         },
+
                         _ => ()
+
                     }
+
                 }
+
             }
+
         });
 
         receiver

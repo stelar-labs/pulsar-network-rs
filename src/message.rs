@@ -1,25 +1,25 @@
 use astro_format::arrays;
-use crate::{ Kind, Message };
+use crate::{ Message, Context };
 use std::error::Error;
 
-impl Kind {
+impl Context {
 
-    pub fn from_bytes(byte: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
+    pub fn from_bytes(byte: &[u8]) -> Result<Self, Box<dyn Error>> {
         match byte[0] {
-            1_u8 => Ok(Kind::GetBlock),
-            2_u8 => Ok(Kind::PostBlock),
-            3_u8 => Ok(Kind::PostTransaction),
-            4_u8 => Ok(Kind::CancelTransaction),
-            _ => Err("Kind from byte error!")?
+            1_u8 => Ok(Context::Block),
+            2_u8 => Ok(Context::BlockRequest),
+            3_u8 => Ok(Context::CancelTransaction),
+            4_u8 => Ok(Context::Transaction),
+            _ => Err("Context from byte error!")?
         }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
         match self {
-            Kind::GetBlock => vec![1_u8],
-            Kind::PostBlock => vec![2_u8],
-            Kind::PostTransaction => vec![3_u8],
-            Kind::CancelTransaction => vec![4_u8],
+            Context::Block => vec![1_u8],
+            Context::BlockRequest => vec![2_u8],
+            Context::CancelTransaction => vec![3_u8],
+            Context::Transaction => vec![4_u8],
         }
     }
 
@@ -27,44 +27,45 @@ impl Kind {
 
 impl Message {
 
-    pub fn new(kind: &Kind, body: &Vec<u8>) -> Self {
+    pub fn new(context: Context, body: &[u8]) -> Self {
 
         Message {
-            body: body.clone(),
-            kind: kind.clone(),
+            body: body.to_vec(),
+            context: context,
         }
 
     }
 
-    pub fn from_bytes(buffer: &Vec<u8>) -> Result<Self, Box<dyn Error>> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Box<dyn Error>> {
 
-        let decoded: Vec<Vec<u8>> = arrays::decode(buffer);
+        let details = arrays::decode(bytes)?;
         
-        if decoded.len() == 2 {
+        if details.len() == 2 {
 
-            match Kind::from_bytes(&decoded[1]) {
+            match Context::from_bytes(details[1]) {
 
-                Ok(k) => {
+                Ok(c) => {
                     
                     Ok(Message {
-                        body: decoded[0].clone(),
-                        kind: k
+                        body: details[0].to_vec(),
+                        context: c
                     })
                 },
                 
                 Err(e) => Err(e)?
             }            
         } else {
-            Err("Message inputs must be 2!")?
+            Err("Message from bytes error!")?
         }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
 
-        arrays::encode(&vec![
-            self.body.clone(),
-            self.kind.to_bytes(),
+        arrays::encode(&[
+            &self.body,
+            &self.context.to_bytes(),
         ])
-
+        
     }
+
 }

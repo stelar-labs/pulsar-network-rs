@@ -1,14 +1,14 @@
 [package]
 name = "pulsar-network"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 license = "MIT"
 description = "Pulsar Network is a distributed hash table peer-to-peer communication protocol for the Astreuos Blockchain."
-repository = "https://github.com/stelar-software/rust-pulsar-network"
+repository = "https://github.com/stelar-labs/pulsar-network-rs"
 readme = "README.md"
 
 [dependencies]
-astro-format = "0.5.0"
-fides = "2.2.1"
+astro-format = "0.8.0"
+fides = "2.3.0"
 rand = "0.8.5"
-opis = "3.0.1"
+opis = "3.1.0"
