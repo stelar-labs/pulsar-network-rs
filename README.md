@@ -46,12 +46,9 @@ let mut message = Message::new(&block_bytes, &chain, &Topic::Block);
 ### Broadcast
 
 ```text
-
-let route = Route::Validation;
-
 let tx_bytes;
 
-client.broadcast(&tx_bytes, &route, &Topic::Transaction);
+client.broadcast(&tx_bytes, &Route::Validation, &Topic::Transaction);
 ```
 
 ### Send

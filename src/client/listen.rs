@@ -95,21 +95,25 @@ impl Client {
                                 Err(_) => (),
                             }
 
-                            let mut outgoing_queue = outgoing_queue_clone.lock().unwrap();
-                            
-                            if !outgoing_queue.is_empty() {
+                            match outgoing_queue_clone.lock() {
 
-                                let (outgoing_message, outgoing_address) = outgoing_queue[0].clone();
+                                Ok(mut outgoing_queue) => {
 
-                                outgoing_queue.remove(0);
+                                    if !outgoing_queue.is_empty() {
 
-                                let _ = socket.send_to(&outgoing_message, outgoing_address);
-                                
-                            }
+                                        let (outgoing_message, outgoing_address) = &outgoing_queue[0];
+
+                                        let _ = socket.send_to(&outgoing_message, outgoing_address);
+
+                                        outgoing_queue.remove(0);
+                                        
+                                    }
+
+                                },
+                                Err(_) => todo!(),
+                            };
                         }
                     }
-                
-
                 },
                 Err(_) => ()
             }
