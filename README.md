@@ -1,32 +1,34 @@
 # Pulsar Network
 
-Pulsar Network is the distributed hash table peer-to-peer communication protocol for the Astreuos Blockchain.
+Pulsar Network is the distributed hash table peer-to-peer communication protocol for the Astreum Blockchain.
 
 ## Features
 
 - send and receive messages between peers.
-- messages are contained in an envelope with the context, nonce, sender, route and time.
-- message encryption uses chacha20poly1305 and a x25519 blake3 flavor as the key.
-- peers can join the network by sending join requests and valid peers returning the nearest peers
-- peers can be pinged and respond with their public key and route supported.
-- currently supported routes are Astreuos blockchain main and test routes used for validation.
+- messages contain a body, chain, nonce, time and topic.
+- peers can join the network by sending join requests to other peers returning known addresses
+- peers can be pinged and respond with the route.
+- message topics are block, block request, cancel transaction, join request, join response, ping request, ping response and transaction
+- currently supported routes are peer and validation.
 
 ## API
 
 ### Client
 
 ```text
-use pulsar_network::{Client, Route};
+use pulsar_network::{Chain, Client, Route, Topic};
 
 let bootstrap = false;
 
-let route = Route::Test
+let chain = Chain::Test;
+
+let route = Route::Peer;
 
 let seeders: Vec<SocketAddr>;
 
-let client = Client::new(bootstrap, route, seeders);
+let client = Client::new(bootstrap, chain, route, seeders);
 
-for (message, peer) in client.messages() {
+for (message, source) in client.messages() {
     println!("Got: {}", message.body);
 }
 ```
@@ -34,31 +36,32 @@ for (message, peer) in client.messages() {
 ### Message
 
 ```text
-use pulsar_network::{Message, Kind};
+use pulsar_network::{Message, Topic};
 
-let mut message = Message::new(Kind::Block, message_bytes);
+let block_bytes;
+
+let mut message = Message::new(&block_bytes, &chain, &Topic::Block);
 ```
 
 ### Broadcast
 
 ```text
-network.broadcast(message);
+
+let route = Route::Validation;
+
+let tx_bytes;
+
+client.broadcast(&tx_bytes, &route, &Topic::Transaction);
 ```
 
 ### Send
 
 ```text
-network.send(message, peer)
+network.send(&address, &block_bytes, &Topic::Block)
 ```
-
-## Improvements
-
-- multi-threading
-- ephemeral keys
-- bluetooth communication
 
 ## Contributions
 
 Pull requests, bug reports and any kind of suggestion are welcome.
 
-2022-05-03
+2022-06-13

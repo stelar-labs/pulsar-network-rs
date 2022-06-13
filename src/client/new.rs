@@ -1,36 +1,42 @@
-use crate::{Client, Route};
-use fides::x25519;
+use crate::{Client, Chain, Route};
 use std::collections::HashMap;
+use std::error::Error;
 use std::sync::{Arc, Mutex};
 use rand::Rng;
 use std::net::{UdpSocket, SocketAddr};
 
 impl Client {
 
-    pub fn new(bootstrap: bool, route: Route, seeders: Vec<SocketAddr>) -> Client {
+    pub fn new(bootstrap: bool, chain: Chain, route: Route, seeders: Vec<SocketAddr>) -> Result<Client, Box<dyn Error>> {
 
-        let private_key: [u8; 32] = x25519::private_key();
+        let port: u16 =
+        
+            if bootstrap {
 
-        let public_key: [u8; 32] = x25519::public_key(&private_key);
+                55555
+            
+            } else {
+                
+                rand::thread_rng().gen_range(49152..65535)
+            
+            };
 
-        let incoming_port: u16 = if bootstrap {
-            55555
-        } else {
-            rand::thread_rng().gen_range(49152..65535)
-        };
+        let address = format!("127.0.0.1:{}", port);
 
-        let outgoing_port: u16 = rand::thread_rng().gen_range(49152..65535);
+        let socket = UdpSocket::bind(address)?;
 
-        Client {
-            bootstrap: bootstrap,
-            private_key: private_key,
-            public_key: public_key,
-            route: route,
+        Ok(Client {
+            bootstrap,
+            chain,
             peers: Arc::new(Mutex::new(HashMap::new())),
-            incoming_socket: Arc::new(Mutex::new(UdpSocket::bind(format!("127.0.0.1:{}", incoming_port)).unwrap())),
-            outgoing_socket: Arc::new(Mutex::new(UdpSocket::bind(format!("127.0.0.1:{}", outgoing_port)).unwrap())),
-            seeders: Arc::new(Mutex::new(seeders))
-        }
+            validators: Arc::new(Mutex::new(HashMap::new())),
+            seeders: Arc::new(Mutex::new(seeders)),
+            socket: Arc::new(Mutex::new(socket)),
+            route,
+            incoming_queue: Arc::new(Mutex::new(Vec::new())),
+            outgoing_queue: Arc::new(Mutex::new(Vec::new()))
+            
+        })
 
     }
     

@@ -1,42 +1,41 @@
-use crate::envelope::{ Envelope, Kind };
-use crate::{Client, Message};
-use fides::chacha20poly1305;
+use crate::{Client, Message, Topic, Route};
 use std::sync::Arc;
 
 impl Client {
 
-    pub fn broadcast(&self, message: Message) {
+    pub fn broadcast(&self, body: &[u8], route: &Route, topic: &Topic) {
 
-        let outgoing_socket_clone = Arc::clone(&self.outgoing_socket);
+        let message = Message::new(body, &self.chain, topic);
 
-        let outgoing_socket = outgoing_socket_clone.lock().unwrap();
+        let message_bytes = message.to_bytes();
+
+        let outgoing_queue_clone = Arc::clone(&self.outgoing_queue);
         
-        let tables_clone = Arc::clone(&self.peers);
+        let peers_clone = Arc::clone(&self.peers);
+        
+        let validators_clone = Arc::clone(&self.validators);
 
-        let tables = tables_clone.lock().unwrap();
+        match outgoing_queue_clone.lock() {
 
-        for (_, table) in tables.clone() {
+            Ok(mut outgoing_queue) => {
 
-            for (_, peer) in table {
+                let peers = match route {
+                    Route::Peer => peers_clone.lock(),
+                    Route::Validation => validators_clone.lock()    
+                };
 
-                match chacha20poly1305::encrypt(&peer.shared_key, &message.to_bytes()) {
-
-                    Ok(cipher) => {
-
-                        let envelope = Envelope::new(Kind::Encrypted, &cipher, &self.public_key, &self.route);
-                        
-                        let _r = outgoing_socket.send_to(&envelope.to_bytes(), &peer.address);
-
+                match peers {
+                    Ok(p) => {
+                        for (_, bucket) in p.iter() {
+                            for (_, address) in bucket {
+                                outgoing_queue.push((message_bytes.clone(), *address))
+                            }
+                        }
                     },
-                    
                     Err(_) => ()
-
-                }
-
-            }
-
-        }
-
+                };
+            },
+            Err(_) => ()
+        };
     }
-
 }
