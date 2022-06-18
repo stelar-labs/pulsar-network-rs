@@ -3,7 +3,7 @@ name = "pulsar-network"
 version = "0.8.0"
 edition = "2021"
 license = "MIT"
-description = "Pulsar Network is a distributed hash table peer-to-peer communication protocol for the Astreuos Blockchain."
+description = "Pulsar Network is a distributed hash table peer-to-peer communication protocol for the Astreum Blockchain."
 repository = "https://github.com/stelar-labs/pulsar-network-rs"
 readme = "README.md"
 

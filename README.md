@@ -2,6 +2,16 @@
 
 Pulsar Network is the distributed hash table peer-to-peer communication protocol for the Astreum Blockchain.
 
+## Author
+
+Roy R. O. Okello
+
+[Email](mailto:0xR3y@protonmail.com)
+
+[Github](https://github.com/0xR3y)
+
+[Twitter](https://twitter.com/0xR3y)
+
 ## Features
 
 - send and receive messages between peers.
@@ -61,4 +71,6 @@ network.send(&address, &block_bytes, &Topic::Block)
 
 Pull requests, bug reports and any kind of suggestion are welcome.
 
-2022-06-13
+[Twitter](https://twitter.com/StelarLabs)
+
+2022-06-18
